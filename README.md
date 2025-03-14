@@ -4,7 +4,7 @@ Hello Everyone in the future!
 
 I've noticed the current Promise types on the Asset Library to be lacking in a few ways, so I improved them.
 
-I replicated ***ALL*** functions related to the Promise type in Javascript (except try(), but that's becuase it's behavior is implied by default).
+I replicated ***ALL*** functions related to the [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) type in Javascript (except try(), but that's becuase it's behavior is implied by default).
 
 Promises can be accepted or rejected. then(), catch(), and finally() functions work as expected with this.
 

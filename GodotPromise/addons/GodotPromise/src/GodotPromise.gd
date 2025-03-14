@@ -185,6 +185,7 @@ func _callback_check(
 			logic.reject(output)
 
 
+## Base Class for Promise Logic
 class AbstractLogic extends RefCounted:
 	signal finished(output)
 	
@@ -232,6 +233,7 @@ class AbstractLogic extends RefCounted:
 		_status = PromiseStatus.Pending
 		_execute()
 	
+	## Overwrite this method to create custom execute logic
 	func _execute() -> void: pass
 	func _emit_finished(output) -> void: finished.emit(output)
 	func _connect_signal(promise, resolve : Callable) -> void:
@@ -250,12 +252,14 @@ class AbstractLogic extends RefCounted:
 			tasks.append(task)
 			task.finished.connect(resolve)
 
+## Base Class for Single Coroutine Promise Logic
 class DirectCoroutineLogic extends AbstractLogic:
 	func _init(promise) -> void:
 		_promise = promise
 	
 	func _execute() -> void: _connect_signal(_promise, resolve)
 
+## Base Class for Multi Coroutine Promise Logic
 class MultiCoroutine extends AbstractLogic:
 	func _init(promises : Array) -> void:
 		_promise = promises
@@ -263,11 +267,14 @@ class MultiCoroutine extends AbstractLogic:
 	func _execute() -> void:
 		for idx : int in range(0, _promise.size()):
 			_connect_signal(_promise[idx], _on_thread_finish.bind(idx))
+	## Overwrite this method to create custom thread logic
 	func _on_thread_finish(output, _index : int) -> void: pass
+## Class for Race Coroutine Promise Logic
 class RaceCoroutine extends MultiCoroutine:
 	func _on_thread_finish(output, _index : int) -> void:
 		resolve(output)
 
+## Base Class for Multi Coroutine Promise Logic that returns an array
 class ArrayCoroutine extends MultiCoroutine:
 	var _outputs : Array
 	var _counter : int
@@ -280,12 +287,13 @@ class ArrayCoroutine extends MultiCoroutine:
 	func _on_thread_finish(output, index : int) -> void:
 		_outputs[index] = output
 		_counter -= 1
+## Class for All Coroutine Promise Logic
 class AllCoroutine extends ArrayCoroutine:
 	func _on_thread_finish(output, index : int) -> void:
 		super(output, index)
 		if _counter == 0:
 			resolve(_outputs)
-
+## Class for AllSettled Coroutine Promise Logic
 class AllSettledCoroutine extends ArrayCoroutine:
 	func _init(promises : Array[Promise]) -> void:
 		super(promises)
@@ -295,6 +303,7 @@ class AllSettledCoroutine extends ArrayCoroutine:
 		_counter -= 1
 		if _counter == 0:
 			resolve(_outputs)
+## Class for Any Coroutine Promise Logic
 class AnyCoroutine extends ArrayCoroutine:
 	func _init(promises : Array[Promise]) -> void:
 		_outputs.resize(promises.size())

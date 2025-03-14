@@ -29,7 +29,7 @@ var _logic : AbstractLogic
 ## Constructor function of the [Promise] class.[br]
 ## The parameter [param async] is the value for the promise to resolve.[br]
 ## If [param executeOnStart] is [code]true[/code], then the promise will immediately call [method execute].
-func _init(async, executeOnStart : bool = true) -> void:
+func _init(async = null, executeOnStart : bool = true) -> void:
 	if async is AbstractLogic:
 		_logic = async
 	else:
@@ -95,13 +95,46 @@ static func any(promises : Array[Promise]) -> Promise:
 	return Promise.new(AnyCoroutine.new(promises), true)
 
 
+## Creates a [Promise] that attempts to resolve [param promise] and [param release] coroutines
+## at the same time. However, this [Promise] will not resolve until [param release] has resolved
+## first.
+## [br][br]
+## Also see [method hold].
+static func on_hold(promise, release) -> Promise:
+	return Promise.new(HoldCoroutine.new(promise, release), true)
+## Extends a [Promise] that attempts to resolve [param promise] and [param release] coroutines
+## at the same time. However, this [Promise] will not resolve until [param release] has resolved
+## first.
+## [br][br]
+## Also see [method hold]. 
+func hold(promise, release) -> Promise:
+	return Promise.new(HoldCoroutine.new(promise, release), true)
+
+
 ## Returns a [Promise] that is rejected and gives [param async] as the reason.
+## [br][br]
+## Unlike [method reject_direct], if [param async] is a coroutine, it will wait
+## for it to finish.
 static func reject(async) -> Promise:
+	var logic := AbstractLogic.new()
+	logic.connect_coroutine(async, logic.reject)
+	return Promise.new(logic, false)
+## Returns a [Promise] that is resolved and gives [param async] as the output.
+## [br][br]
+## Unlike [method reject_direct], if [param async] is a coroutine, it will wait
+## for it to finish.
+static func resolve(async) -> Promise:
+	var logic := AbstractLogic.new()
+	logic.connect_coroutine(async, logic.resolve)
+	return Promise.new(logic, false)
+
+## Returns a [Promise] that is rejected and gives [param async] as the reason.
+static func reject_raw(async) -> Promise:
 	var logic := AbstractLogic.new()
 	logic.reject(async)
 	return Promise.new(logic, false)
 ## Returns a [Promise] that is resolved and gives [param async] as the output.
-static func resolve(async) -> Promise:
+static func resolve_raw(async) -> Promise:
 	var logic := AbstractLogic.new()
 	logic.resolve(async)
 	return Promise.new(logic, false)
@@ -201,7 +234,7 @@ class AbstractLogic extends RefCounted:
 				return
 			_signal_callback(async)
 	
-	var tasks : Array[Task]
+	var _tasks : Array[Task]
 	var _status : PromiseStatus = PromiseStatus.Initialized
 	var _promise = null
 	var _output = null
@@ -233,31 +266,63 @@ class AbstractLogic extends RefCounted:
 		_status = PromiseStatus.Pending
 		_execute()
 	
+	## A method to connect the coroutine to a resolving function.
+	func connect_coroutine(promise, resolve : Callable) -> void:
+		if promise is Promise:
+			if promise.is_finished():
+				match promise.get_status():
+					PromiseStatus.Accepted:
+						resolve(promise.get_result())
+					PromiseStatus.Rejected:
+						reject(promise.get_result())
+				return	
+			promise.finished.connect(resolve)
+			return
+		
+		if promise is Callable:
+			if !promise.is_valid():
+				reject("Invaild Callable")
+				return
+		elif !(promise is Signal):
+			resolve(promise)
+			return
+			
+		var task := Task.new(promise)
+		_tasks.append(task)
+		task.finished.connect(resolve)
+	
 	## Overwrite this method to create custom execute logic
 	func _execute() -> void: pass
+	## Allows deferred emition of the [finished] signal.
 	func _emit_finished(output) -> void: finished.emit(output)
-	func _connect_signal(promise, resolve : Callable) -> void:
-		if promise is Promise:
-			promise.finished.connect(resolve)
-		else:
-			if promise is Callable:
-				if !promise.is_valid():
-					reject("Invaild Callable")
-					return
-			elif !(promise is Signal):
-				resolve(promise)
-				return
-			
-			var task := Task.new(promise)
-			tasks.append(task)
-			task.finished.connect(resolve)
 
 ## Base Class for Single Coroutine Promise Logic
 class DirectCoroutineLogic extends AbstractLogic:
 	func _init(promise) -> void:
 		_promise = promise
 	
-	func _execute() -> void: _connect_signal(_promise, resolve)
+	func _execute() -> void: connect_coroutine(_promise, resolve)
+## Class for Hold Coroutine Promise Logic
+class HoldCoroutine extends DirectCoroutineLogic:
+	signal _unpause
+	
+	var _unpaused_flag : bool
+	var _interfere
+	
+	func _init(promise, interfere) -> void:
+		super(promise)
+		_interfere = interfere
+	
+	func emit_unpaused(_output = null) -> void:
+		_unpaused_flag = true
+		_unpause.emit()
+	
+	func _execute() -> void:
+		connect_coroutine(_promise, _on_thread_finish)
+		connect_coroutine(_interfere, emit_unpaused)
+	func _on_thread_finish(output) -> void:
+		if !_unpaused_flag: await _unpause
+		resolve(output)
 
 ## Base Class for Multi Coroutine Promise Logic
 class MultiCoroutine extends AbstractLogic:
@@ -266,7 +331,7 @@ class MultiCoroutine extends AbstractLogic:
 	
 	func _execute() -> void:
 		for idx : int in range(0, _promise.size()):
-			_connect_signal(_promise[idx], _on_thread_finish.bind(idx))
+			connect_coroutine(_promise[idx], _on_thread_finish.bind(idx))
 	## Overwrite this method to create custom thread logic
 	func _on_thread_finish(output, _index : int) -> void: pass
 ## Class for Race Coroutine Promise Logic
@@ -306,8 +371,6 @@ class AllSettledCoroutine extends ArrayCoroutine:
 ## Class for Any Coroutine Promise Logic
 class AnyCoroutine extends ArrayCoroutine:
 	func _init(promises : Array[Promise]) -> void:
-		_outputs.resize(promises.size())
-		_counter = promises.size()
 		super(promises)
 	
 	func _on_thread_finish(output, index : int) -> void:

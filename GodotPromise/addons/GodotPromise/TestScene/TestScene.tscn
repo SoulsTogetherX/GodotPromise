@@ -1,8 +1,9 @@
 [gd_scene load_steps=2 format=3 uid="uid://7ltrb30dfgkx"]
 
-[ext_resource type="Script" uid="uid://by5vj12uxyo7e" path="res://addons/GodotPromise/TestScene/test_scene.gd" id="1_1pxhs"]
+[ext_resource type="Script" path="res://addons/GodotPromise/TestScene/test_scene.gd" id="1_1pxhs"]
 
 [node name="TestScene" type="Control"]
 layout_mode = 3
 anchors_preset = 0
 script = ExtResource("1_1pxhs")
+start_tests = true

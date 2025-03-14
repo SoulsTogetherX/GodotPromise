@@ -38,11 +38,11 @@ Again, you may also chain Promises. For example:
 
 ```
 print(
-    await Promise.any([val1, val2, val3, val4]).then(
-        "At least one coroutine was resolved"
-    ).catch(
-        "All coroutines were rejected! O:"
-    ).finished
+	await Promise.any([val1, val2, val3, val4]).then(
+		"At least one coroutine was resolved"
+	).catch(
+		"All coroutines were rejected! O:"
+	).finished
 )
 ```
 

@@ -2,7 +2,10 @@
 @tool
 extends Control
 
-@export_tool_button("Start Tests") var start_tests = all_tests_check
+@export var start_tests : bool:
+	set(val):
+		start_tests = val
+		all_tests_check()
 
 
 func timeout(time : float) -> Signal:

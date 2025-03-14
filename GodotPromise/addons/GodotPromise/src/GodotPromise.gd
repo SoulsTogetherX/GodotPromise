@@ -115,7 +115,7 @@ static func withCallback(async : Callable) -> Promise:
 	return Promise.new(logic, true)
 ## Returns an object including a [Promise], based on an async [Callable], a function to resolve
 ## the [Promise], and a function to reject the [Promise].
-static func withResolvers(async) -> Dictionary[String, Variant]:
+static func withResolvers(async) -> Dictionary:
 	var logic := DirectCoroutineLogic.new(async)
 	return {
 		"Promise": Promise.new(logic, true),
@@ -127,7 +127,7 @@ static func withResolvers(async) -> Dictionary[String, Variant]:
 ## method to bind two [Callable]s to resolve and reject the [Promise], respectfully.
 ## [br][br]
 ## A combined form of [method withResolvers] and [method withCallback].
-static func withCallbackResolvers(async : Callable) -> Dictionary[String, Variant]:
+static func withCallbackResolvers(async : Callable) -> Dictionary:
 	var logic := DirectCoroutineLogic.new(null)
 	logic._promise = async.bind(logic.resolve, logic.reject)
 	

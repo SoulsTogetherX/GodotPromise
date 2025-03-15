@@ -5,8 +5,7 @@ extends Control
 @export var start_tests : bool:
 	set(val):
 		start_tests = val
-		await all_tests_check()
-		await all_EX_tests_check()
+		await all_check()
 
 
 	# <HELPER FUNCTIONS>
@@ -15,6 +14,14 @@ func timeout(time : float) -> Signal:
 func caller(time : float, message : String) -> String:
 	await timeout(time)
 	return "Returned with time (" + str(time) + ") and message: \"" + message + "\""
+
+
+func all_check() -> void:
+	print("Starting Check...\n")
+	await all_tests_check()
+	await all_EX_tests_check()
+	print("Check Finished")
+
 
 	# <PROMISE>
 func all_tests_check() -> void:
@@ -26,6 +33,8 @@ func all_tests_check() -> void:
 	await test_race()
 	await test_any()
 	
+	await test_on_hold()
+	
 	await test_reject()
 	await test_resolve()
 	
@@ -33,6 +42,8 @@ func all_tests_check() -> void:
 	await test_withCallback()
 	await test_withCallbackResolvers()
 	
+	await test_chain()
+	await test_hold()
 	await test_finally()
 	await test_catch()
 	await test_then()
@@ -40,23 +51,23 @@ func all_tests_check() -> void:
 func test_new() -> void:
 	print(
 		"Start test_new()",
-		"\n<null> Output:",
+		"\n<null> Output: ",
 		await Promise.new().finished,
-		"\n<signal> Output:",
+		"\n<signal> Output: ",
 		await Promise.new(timeout(0.1)).finished,
-		"\n<Callable> Output:",
+		"\n<Callable> Output: ",
 		await Promise.new(caller.bind(0.1, "Message")).finished,
-		"\n<Promise (Unfinished)> Output:",
-		await Promise.new(Promise.new(timeout(0.1))).finished,
-		"\n<Promise (Finished)> Output:",
-		await Promise.new(Promise.new(null)).finished,
+		"\n<Promise (Unfinished)> Output: ",
+		await Promise.new(Promise.new(timeout(0.1)).finally("Message")).finished,
+		"\n<Promise (Finished)> Output: ",
+		await Promise.new(Promise.new(null).finally("Message")).finished,
 		"\nEnd test_new()\n",
 	)
 
 func test_all() -> void:
 	print(
 		"Start test_all()",
-		"\nOutput:",
+		"\nOutput: ",
 		await Promise.all([
 			caller.bind(0.3, "Resolved 0.3"),
 			caller.bind(0.2, "Resolved 0.2"),
@@ -69,7 +80,7 @@ func test_all() -> void:
 func test_allSettled() -> void:
 	print(
 		"Start test_allSettled()",
-		"\nOutput:",
+		"\nOutput: ",
 		await Promise.allSettled([
 			Promise.resolve(caller.bind(0.3, "Resolved 0.3")),
 			Promise.reject(caller.bind(0.2, "Rejected 0.2")),
@@ -83,7 +94,7 @@ func test_allSettled() -> void:
 func test_race() -> void:
 	print(
 		"Start test_race()",
-		"\nOutput:",
+		"\nOutput: ",
 		await Promise.race([
 			caller.bind(0.3, "Resolved 0.3"),
 			caller.bind(0.2, "Resolved 0.2"),
@@ -96,8 +107,8 @@ func test_race() -> void:
 func test_any() -> void:
 	print(
 		"Start test_any()",
-		"\nOutput:",
-		await Promise.allSettled([
+		"\nOutput: ",
+		await Promise.any([
 			Promise.resolve(caller.bind(0.3, "Resolved 0.3")),
 			Promise.reject(caller.bind(0.2, "Rejected 0.2")),
 			Promise.new(caller.bind(0.4, "Resolved 0.4")),
@@ -107,17 +118,30 @@ func test_any() -> void:
 		"\nEnd test_any()\n",
 	)
 
+func test_on_hold() -> void:
+	print("Start test_on_hold()")
+	timeout(0.25).connect(print.bind("0.25 seconds have passed"))
+	print(
+		"promise 0.25, hold 0.5",
+		"\nOutput: ",
+		await Promise.on_hold(caller.bind(0.25, "Resolved 0.25"), timeout(0.5)).finished,
+		"\npromise 0.5, hold 0.25",
+		"\nOutput: ",
+		await Promise.on_hold(caller.bind(0.5, "Resolved 0.5"), timeout(0.25)).finished,
+		"\nEnd test_on_hold()\n",
+	)
+
 func test_reject() -> void:
 	print(
 		"Start test_reject()",
-		"\nOutput:",
+		"\nOutput: ",
 		await Promise.reject("Rejected").finished,
 		"\nEnd test_reject()\n",
 	)
 func test_resolve() -> void:
 	print(
 		"Start test_resolve()",
-		"\nOutput:",
+		"\nOutput: ",
 		await Promise.resolve("Resolved").finished,
 		"\nEnd test_resolve()\n",
 	)
@@ -154,9 +178,13 @@ func test_withCallbackResolvers() -> void:
 		"Start withCallbackResolvers()",
 		"\nTest Inner Reject:",
 		"\nOutput: ",
-		await Promise.withCallbackResolvers(_resolver_callback_test.bind(0.5, false)).Promise.catch("Output was Rejected").finished,
+		await Promise.withCallbackResolvers(
+			_resolver_callback_test.bind(0.5, false)
+		).Promise.catch("Output was Rejected").finished,
 		"\nTest Inner Resolve:\nOutput: ",
-		await Promise.withCallbackResolvers(_resolver_callback_test.bind(0.5, true)).Promise.then("Output was Resolved").finished,
+		await Promise.withCallbackResolvers(
+			_resolver_callback_test.bind(0.5, true)
+		).Promise.then("Output was Resolved").finished,
 	)
 	
 	var reject := Promise.withCallbackResolvers(_resolver_callback_test.bind(0.5, false))
@@ -176,14 +204,38 @@ func test_withCallbackResolvers() -> void:
 	)
 func _callback_test(resolver : Callable, rejecter : Callable, resolve : bool) -> void:
 	if resolve:
-		if resolver.is_valid(): resolver.call("Resolved")
-	else:
-		if rejecter.is_valid(): rejecter.call("Rejected")
+		if resolver.is_valid():
+			resolver.call("Resolved")
+			return
+	if rejecter.is_valid():
+		rejecter.call("Rejected")
 func _resolver_test(time : float, call : Callable) -> void:
-	timeout(time).connect(call)
+	await timeout(time)
+	await call.call()
 func _resolver_callback_test(resolver : Callable, rejecter : Callable, time : float, resolve : bool) -> void:
-	_resolver_test(time, _callback_test.bind(resolver, rejecter, resolve))
+	await _resolver_test(time, _callback_test.bind(resolver, rejecter, resolve))
 
+func test_chain() -> void:
+	print(
+		"Start test_chain()",
+		"\nOutput: ",
+		await Promise.new("Hello World").chain().finally(_test_chain_resolver).finished,
+		"\nEnd test_chain()\n",
+	)
+func _test_chain_resolver(arg : String) -> String:
+	return "receieved argument '" + arg + "'"
+func test_hold() -> void:
+	print("Start test_hold()")
+	timeout(0.25).connect(print.bind("0.25 seconds have passed"))
+	print(
+		"promise 0.25, hold 0.5",
+		"\nOutput: ",
+		await Promise.new().hold(caller.bind(0.25, "Resolved 0.25"), timeout(0.5)).finished,
+		"\npromise 0.5, hold 0.25",
+		"\nOutput: ",
+		await Promise.new().hold(caller.bind(0.5, "Resolved 0.5"), timeout(0.25)).finished,
+		"\nEnd test_hold()\n",
+	)
 func test_finally() -> void:
 	print(
 		"Start test_finally()",
@@ -221,9 +273,6 @@ func test_then() -> void:
 func all_EX_tests_check() -> void:
 	await test_interfere()
 	
-	#await test_hold()
-	await test_on_hold()
-	
 	await test_sort()
 	await test_rsort()
 	
@@ -235,20 +284,20 @@ func all_EX_tests_check() -> void:
 func test_interfere() -> void:
 	print(
 		"Start test_interfere()",
-		"\nPromise 0.5, Interfere 0.25",
-		"\nOutput:",
+		"\nPromise 0.25, Interfere 0.5",
+		"\nOutput: ",
 		await PromiseEx.interfere(
 			caller.bind(0.25, "Accepted 0.25"),
 			caller.bind(0.5, "Rejected 0.5")
 		).finished,
-		"\nPromise 0.25, Interfere 0.5",
-		"\nOutput:",
+		"\nPromise 0.5, Interfere 0.25",
+		"\nOutput: ",
 		await PromiseEx.interfere(
 			caller.bind(0.5, "Accepted 0.5"),
 			caller.bind(0.25, "Rejected 0.25")
 		).finished,
 		"\nPromise 0.5, Interfere 0.5",
-		"\nOutput:",
+		"\nOutput: ",
 		await PromiseEx.interfere(
 			caller.bind(0.5, "Accepted 0.5"),
 			caller.bind(0.5, "Rejected 0.5")
@@ -256,35 +305,10 @@ func test_interfere() -> void:
 		"\nEnd test_interfere()\n",
 	)
 
-func test_hold() -> void:
-	print("Start test_hold()")
-	timeout(0.25).connect(print.bind("0.25 seconds have passed"))
-	print(
-		"promise 0.25, hold 0.5",
-		"\nOutput:",
-		await Promise.new("").hold(caller.bind(0.25, "Resolved 0.25"), timeout(0.5)).finished,
-		"\npromise 0.5, hold 0.25",
-		"\nOutput:",
-		await Promise.new("").hold(caller.bind(0.5, "Resolved 0.5"), timeout(0.25)).finished,
-		"\nEnd test_hold()\n",
-	)
-func test_on_hold() -> void:
-	print("Start test_on_hold()")
-	timeout(0.25).connect(print.bind("0.25 seconds have passed"))
-	print(
-		"promise 0.25, hold 0.5",
-		"\nOutput:",
-		await PromiseEx.on_hold(caller.bind(0.25, "Resolved 0.25"), timeout(0.5)).finished,
-		"\npromise 0.5, hold 0.25",
-		"\nOutput:",
-		await PromiseEx.on_hold(caller.bind(0.5, "Resolved 0.5"), timeout(0.25)).finished,
-		"\nEnd test_on_hold()\n",
-	)
-
 func test_sort() -> void:
 	print(
 		"Start test_sort()",
-		"\nOutput:",
+		"\nOutput: ",
 		await PromiseEx.sort([
 			Promise.resolve(caller.bind(0.3, "Resolved 0.3")),
 			Promise.reject(caller.bind(0.2, "Rejected 0.2")),
@@ -297,7 +321,7 @@ func test_sort() -> void:
 func test_rsort() -> void:
 	print(
 		"Start test_rsort()",
-		"\nOutput:",
+		"\nOutput: ",
 		await PromiseEx.rSort([
 			Promise.resolve(caller.bind(0.3, "Resolved 0.3")),
 			Promise.reject(caller.bind(0.2, "Rejected 0.2")),
@@ -312,7 +336,7 @@ func test_firstN() -> void:
 	print(
 		"Start test_firstN()",
 		"\nFive coroutines, n=3",
-		"\nOutput:",
+		"\nOutput: ",
 		await PromiseEx.firstN([
 			Promise.resolve(caller.bind(0.3, "Resolved 0.3")),
 			Promise.reject(caller.bind(0.2, "Rejected 0.2")),
@@ -321,7 +345,7 @@ func test_firstN() -> void:
 			Promise.new(caller.bind(0.5, "Resolved 0.5"))
 		], 3).finished,
 		"\nThree coroutines, n=5",
-		"\nOutput:",
+		"\nOutput: ",
 		await PromiseEx.firstN([
 			Promise.resolve(caller.bind(0.3, "Resolved 0.3")),
 			Promise.reject(caller.bind(0.2, "Rejected 0.2")),
@@ -333,7 +357,7 @@ func test_lastN() -> void:
 	print(
 		"Start test_lastN()",
 		"\nFive coroutines, n=3",
-		"\nOutput:",
+		"\nOutput: ",
 		await PromiseEx.lastN([
 			Promise.resolve(caller.bind(0.3, "Resolved 0.3")),
 			Promise.reject(caller.bind(0.2, "Rejected 0.2")),
@@ -342,7 +366,7 @@ func test_lastN() -> void:
 			Promise.new(caller.bind(0.5, "Resolved 0.5")),
 		], 3).finished,
 		"\nThree coroutines, n=5",
-		"\nOutput:",
+		"\nOutput: ",
 		await PromiseEx.lastN([
 			Promise.resolve(caller.bind(0.3, "Resolved 0.3")),
 			Promise.reject(caller.bind(0.2, "Rejected 0.2")),
@@ -354,13 +378,13 @@ func test_lastN() -> void:
 func test_anyReject() -> void:
 	print(
 		"Start test_anyReject()",
-		"\nOutput:",
+		"\nOutput: ",
 		await PromiseEx.anyReject([
-			Promise.resolve(caller.bind(0.3, "Resolved 0.3")),
-			Promise.reject(caller.bind(0.2, "Rejected 0.2")),
+			Promise.resolve(caller.bind(0.2, "Resolved 0.2")),
+			Promise.reject(caller.bind(0.7, "Rejected 0.7")),
 			Promise.new(caller.bind(0.4, "Resolved 0.4")),
-			Promise.reject(caller.bind(0.1, "Rejected 0.1")),
-			Promise.new(caller.bind(0.5, "Resolved 0.5")),
+			Promise.reject(caller.bind(0.3, "Rejected 0.3")),
+			Promise.new(caller.bind(0.1, "Resolved 0.1")),
 		]).finished,
 		"\nEnd test_anyReject()\n",
 	)

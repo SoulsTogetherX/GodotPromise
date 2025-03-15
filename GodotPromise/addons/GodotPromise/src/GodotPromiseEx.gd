@@ -4,6 +4,7 @@
 class_name PromiseEx extends Promise
 ## An extension to the [Promise] class to showcase how easy it is to create custom [Promise] behavior.
 
+	# <PROMISE CREATION FUNCTIONS>
 ## Requests two coroutines that race. If [param promise] finishes first, this [Promise] is accepted.
 ## If [param interfere] finishes first, this [Promise] is rejected.[br]
 ## If the coroutines end at the same time, [param promise] has the priority.
@@ -45,6 +46,7 @@ static func anyReject(promises : Array[Promise]) -> Promise:
 	return Promise.new(AnyRejectCoroutine.new(promises), true)
 
 
+	# <BASE CLASSES>
 ## Class for Interfere Coroutine Promise Logic
 class InterfereCoroutine extends DirectCoroutineLogic:
 	var _interfere

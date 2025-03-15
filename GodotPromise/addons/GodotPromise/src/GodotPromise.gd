@@ -75,6 +75,9 @@ func execute() -> void:
 ## Gets the current status of the [Promise]. Also see [enum PromiseStatus].
 func get_status() -> PromiseStatus:
 	return _logic.get_status()
+## Gets the previous [Promise] in this [Promise] chain, if it exists.
+func get_prev() -> Promise:
+	return _logic.get_prev()
 ## Returns if the current [Promise] has finished.
 func is_finished() -> bool:
 	return _logic.is_finished()
@@ -90,12 +93,12 @@ func get_result():
 	# <PROMISE CREATION FUNCTIONS>
 ## Returns a [Promise] of all coroutines, sorting their outputs in an [Array], and finishes
 ## only when all coroutines have finished.
-static func all(promises : Array) -> Promise:
+static func all(promises : Array = []) -> Promise:
 	return Promise.new(AllCoroutine.new(promises), true)
 ## Returns a [Promise] of all coroutines, returning their accepted ([code]true[/code])
 ## or rejected ([code]false[/code]) status in an [Array], and finishes only when all
 ## coroutines have finished. Also see [enum PromiseStatus].
-static func allSettled(promises : Array[Promise]) -> Promise:
+static func allSettled(promises : Array[Promise] = []) -> Promise:
 	return Promise.new(AllSettledCoroutine.new(promises), true)
 
 
@@ -103,53 +106,49 @@ static func allSettled(promises : Array[Promise]) -> Promise:
 ## given coroutines, regardless of if it was accepted or rejected.
 ## [br][br]
 ## Also sees [method reject] and [method resolve].
-static func race(promises : Array) -> Promise:
+static func race(promises : Array = []) -> Promise:
 	return Promise.new(RaceCoroutine.new(promises), true)
 ## Returns a [Promise] that finishes and returns the result of the first coroutine to be accepted
 ## from the given coroutines. It ignores all coroutines reject, unless all coroutines are rejected.
 ## If all coroutines are rejected, it will send an array of reject outputs.
 ## [br][br]
 ## Also sees [method reject] and [method resolve].
-static func any(promises : Array[Promise]) -> Promise:
+static func any(promises : Array[Promise] = []) -> Promise:
 	return Promise.new(AnyCoroutine.new(promises), true)
 
 
-## Creates a [Promise] that attempts to resolve [param promise] and [param release] coroutines
-## at the same time. However, this [Promise] will not resolve until [param release] has resolved
-## first.
-## [br][br]
-## Also see [method hold].
-static func on_hold(promise, release) -> Promise:
-	return Promise.new(HoldCoroutine.new(promise, release), true)
-
-
 ## Returns a [Promise] that is rejected and gives [param async] as the reason.
 ## [br][br]
 ## Unlike [method reject_direct], if [param async] is a coroutine, it will wait
 ## for it to finish.
-static func reject(async) -> Promise:
-	var logic := AbstractLogic.new()
-	logic.connect_coroutine(async, logic.reject)
-	return Promise.new(logic, false)
+static func reject(async = null) -> Promise:
+	var logic := DirectCoroutineLogic.new(async)
+	logic.pass_status(false)
+	return Promise.new(logic, true)
 ## Returns a [Promise] that is resolved and gives [param async] as the output.
 ## [br][br]
 ## Unlike [method reject_direct], if [param async] is a coroutine, it will wait
-## for it to finish.
-static func resolve(async) -> Promise:
-	var logic := AbstractLogic.new()
-	logic.connect_coroutine(async, logic.resolve)
-	return Promise.new(logic, false)
+## for it to finish. [br]
+## Functionally, this is equalvent [method Promise.new].
+static func resolve(async = null) -> Promise:
+	var logic := DirectCoroutineLogic.new(async)
+	logic.pass_status(true)
+	return Promise.new(logic, true)
 
 ## Returns a [Promise] that is rejected and gives [param async] as the reason.
-static func reject_raw(async) -> Promise:
+## [br][br]
+## If given a coroutine as parameter, it does not attempt to resolve or reject it.
+static func reject_raw(async = null) -> Promise:
 	var logic := AbstractLogic.new()
 	logic.reject(async)
-	return Promise.new(logic, false)
+	return Promise.new(logic, true)
 ## Returns a [Promise] that is resolved and gives [param async] as the output.
-static func resolve_raw(async) -> Promise:
+## [br][br]
+## If given a coroutine as parameter, it does not attempt to resolve or reject it.
+static func resolve_raw(async = null) -> Promise:
 	var logic := AbstractLogic.new()
 	logic.resolve(async)
-	return Promise.new(logic, false)
+	return Promise.new(logic, true)
 
 
 ## Returns a [Promise] based on an async [Callable]. Uses the [method Callable.bind] method
@@ -160,7 +159,7 @@ static func withCallback(async : Callable) -> Promise:
 	return Promise.new(logic, true)
 ## Returns an object including a [Promise], based on an async [Callable], a function to resolve
 ## the [Promise], and a function to reject the [Promise].
-static func withResolvers(async) -> Dictionary:
+static func withResolvers(async = null) -> Dictionary:
 	var logic := DirectCoroutineLogic.new(async)
 	return {
 		"Promise": Promise.new(logic, true),
@@ -191,66 +190,43 @@ func chain(toggle : bool = true) -> Promise:
 	chaining = toggle
 	return self
 ## Extends the [Promise] chain.[br]
-## Extends a [Promise] that attempts to resolve [param promise] and [param release]
-## coroutines at the same time. However, this [Promise] will not resolve until
-## [param release] has resolved first.
-## [br][br]
-## Also see [method hold]. 
-func hold(promise, release) -> Promise:
-	var promise_obj := Promise.new(HoldCoroutine.new(promise, release), true)
-	_chain_extention(_handle_inline.bind(promise_obj))
-	return promise_obj
-## Extends the [Promise] chain.[br]
 ## Returns a new [Promise] that is executed immediately after this [Promise] is finished, regardless
 ## of if it is accepted or rejected.
 ## [br][br]
 ## Also see [method execute].
-func finally(async) -> Promise:
-	var promise := Promise.new(async, false)
-	_chain_extention(_handle_inline.bind(promise))
+func finally(async = null) -> Promise:
+	var promise := Promise.new(DirectCoroutineLogic.new(async), false)
+	_chain_extention(_copy_status, promise)
 	return promise
 ## Extends the [Promise] chain.[br]
 ## Returns a new [Promise] that is executed immediately after this [Promise] is rejected. If this
 ## [Promise] is accepted instead, then the newly created [Promise] is also immediately accepted.
 ## [br][br]
 ## Also see [method execute].
-func catch(async) -> Promise:
-	var promise := Promise.new(async, false)
-	_chain_extention(_handle_inline_ex.bind(async, PromiseStatus.Rejected, promise))
+func catch(async = null) -> Promise:
+	var promise := Promise.new(ForceCoroutineLogic.new(async), false)
+	_chain_extention(_passthrough_at_desired, promise, [async, PromiseStatus.Rejected])
 	return promise
 ## Extends the [Promise] chain.[br]
 ## Returns a new [Promise] that is executed immediately after this [Promise] is accepted. If this
 ## [Promise] is rejected instead, then the newly created [Promise] is also immediately rejected.
 ## [br][br]
 ## Also see [method execute].
-func then(async) -> Promise:
-	var promise := Promise.new(async, false)
-	_chain_extention(_handle_inline_ex.bind(async, PromiseStatus.Accepted, promise))
+func then(async = null) -> Promise:
+	var promise := Promise.new(ForceCoroutineLogic.new(async), false)
+	_chain_extention(_passthrough_at_desired, promise, [async, PromiseStatus.Accepted])
 	return promise
 
 
 	# <HELPER FUNCTIONS>
-func _chain_extention(call : Callable) -> void:
+func _chain_extention(call : Callable, promise : Promise, args : Array = []) -> void:
+	promise._logic._prev = self
+	call = call.bind(promise).bindv(args)
+	
 	if _logic.is_finished():
 		call.call(get_result())
 		return
-	finished.connect(call, CONNECT_ONE_SHOT)
-func _handle_inline(arg, promise : Promise) -> void:
-	_handle_chain(arg, promise)
-	promise.execute()
-func _handle_inline_ex(
-	current_output = null,
-	async_output = null,
-	desired_status : PromiseStatus = PromiseStatus.Accepted,
-	promise : Promise = null
-) -> void:
-	_handle_chain(current_output, promise)
-	var output = async_output if get_status() == desired_status else current_output
-	match get_status():
-		PromiseStatus.Accepted:
-			promise._logic.resolve(output)
-		PromiseStatus.Rejected:
-			promise._logic.reject(output)
+	finished.connect(call)
 func _handle_chain(arg, promise : Promise) -> void:
 	if chaining:
 		promise.chaining = true
@@ -258,6 +234,26 @@ func _handle_chain(arg, promise : Promise) -> void:
 			promise._logic.bind(arg)
 		else:
 			promise._logic.bind([arg])
+
+func _inline(input, promise : Promise) -> void:
+	_handle_chain(input, promise)
+	promise.execute()
+func _copy_status(input, promise : Promise) -> void:
+	if promise._logic is DirectCoroutineLogic:
+		promise._logic.pass_status(get_status() == PromiseStatus.Accepted)
+	
+	_inline(input, promise)
+func _passthrough_at_desired(
+	input,
+	async,
+	desired_status : PromiseStatus,
+	promise : Promise,
+) -> void:
+	if promise._logic is ForceCoroutineLogic:
+		var overwrite = async if get_status() == desired_status else input
+		promise._logic.pass_overwrite(overwrite)
+	
+	_copy_status(input, promise)
 
 
 	# <BASE CLASSES>
@@ -284,6 +280,7 @@ class AbstractLogic extends RefCounted:
 	
 	var _args : Array
 	var _tasks : Array[Task]
+	var _prev : Promise # Needed so Godot doesn't clear a chain of Promises Prematurely
 	var _status : PromiseStatus = PromiseStatus.Initialized
 	var _promise = null
 	var _output = null
@@ -305,6 +302,8 @@ class AbstractLogic extends RefCounted:
 		return _status >= PromiseStatus.Accepted
 	func get_status() -> PromiseStatus:
 		return _status
+	func get_prev() -> Promise:
+		return _prev
 	func get_promise_object():
 		return _promise
 	func get_output():
@@ -336,7 +335,7 @@ class AbstractLogic extends RefCounted:
 		elif !(promise is Signal):
 			process.call(promise)
 			return
-			
+		
 		var task := Task.new(promise, _args)
 		task.finished.connect(process)
 		task.execute()
@@ -349,32 +348,23 @@ class AbstractLogic extends RefCounted:
 
 ## Base Class for Single Coroutine Promise Logic
 class DirectCoroutineLogic extends AbstractLogic:
+	var _status_process : Callable = resolve
+	
 	func _init(promise) -> void:
 		_promise = promise
+	func _execute() -> void:
+		connect_coroutine(_promise, _status_process)
+	
+	func pass_status(accept : bool = true) -> void:
+		_status_process = resolve if accept else reject
+## Class for Force Coroutine Promise Logic
+class ForceCoroutineLogic extends DirectCoroutineLogic:
+	var _overwrite = null
+	func pass_overwrite(overwrite) -> void:
+		_overwrite = overwrite
 	
 	func _execute() -> void:
-		connect_coroutine(_promise, resolve)
-## Class for Hold Coroutine Promise Logic
-class HoldCoroutine extends DirectCoroutineLogic:
-	signal _unpause
-	
-	var _unpaused_flag : bool
-	var _interfere
-	
-	func _init(promise, interfere) -> void:
-		super(promise)
-		_interfere = interfere
-	
-	func emit_unpaused(_output = null) -> void:
-		_unpaused_flag = true
-		_unpause.emit()
-	
-	func _execute() -> void:
-		connect_coroutine(_promise, _on_thread_finish)
-		connect_coroutine(_interfere, emit_unpaused)
-	func _on_thread_finish(output) -> void:
-		if !_unpaused_flag: await _unpause
-		resolve(output)
+		connect_coroutine(_overwrite, _status_process)
 
 ## Base Class for Multi Coroutine Promise Logic
 class MultiCoroutine extends AbstractLogic:

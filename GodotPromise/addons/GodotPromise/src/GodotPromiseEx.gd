@@ -11,6 +11,14 @@ class_name PromiseEx extends Promise
 static func interfere(promise, interfere) -> Promise:
 	return Promise.new(InterfereCoroutine.new(promise, interfere), true)
 
+## Creates a [Promise] that attempts to resolve [param promise] and [param release] coroutines
+## at the same time. However, this [Promise] will not resolve until [param release] has resolved
+## first.
+## [br][br]
+## Also see [method hold].
+static func hold(promise = null, release = null) -> Promise:
+	return Promise.new(HoldCoroutine.new(promise, release), true)
+
 ## Waits until all coroutines, then returns their result in an [Array] sorted by order they finished
 ## in. First finished starts the [Array] and last finished ends the [Array].
 ## [br][br]
@@ -59,6 +67,28 @@ class InterfereCoroutine extends DirectCoroutineLogic:
 		super()
 		connect_coroutine(_interfere, reject)
 
+## Class for Hold Coroutine Promise Logic
+class HoldCoroutine extends DirectCoroutineLogic:
+	signal _unpause
+	
+	var _unpaused_flag : bool
+	var _interfere
+	
+	func _init(promise, interfere) -> void:
+		super(promise)
+		_interfere = interfere
+	
+	func emit_unpaused(_output = null) -> void:
+		_unpaused_flag = true
+		_unpause.emit()
+	
+	func _execute() -> void:
+		connect_coroutine(_promise, _on_thread_finish)
+		connect_coroutine(_interfere, emit_unpaused)
+	func _on_thread_finish(output) -> void:
+		if !_unpaused_flag: await _unpause
+		_status_process.call(output)
+
 ## Class for Sort Coroutine Promise Logic
 class SortCoroutine extends AllCoroutine:
 	func _on_thread_finish(output, _index : int) -> void:
@@ -75,7 +105,7 @@ class FirstNCoroutine extends SortCoroutine:
 		_promise = promises
 	
 	func _on_thread_finish(output, _index : int) -> void:
-		if _counter < 0: return
+		if _counter <= 0: return
 		super(output, _index)
 
 ## Class for RSort Coroutine Promise Logic

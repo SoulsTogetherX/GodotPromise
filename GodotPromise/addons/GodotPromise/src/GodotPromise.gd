@@ -191,33 +191,41 @@ func chain(toggle : bool = true) -> Promise:
 	return self
 ## Extends the [Promise] chain.[br]
 ## Returns a new [Promise] that is executed immediately after this [Promise] is finished, regardless
-## of if it is accepted or rejected.[br]
+## of if it is accepted or rejected.
 ## [br][br]
-## Also see [method execute].
-func finally(async = null) -> Promise:
-	var promise := Promise.new(StatusCoroutineLogic.new(async), false)
+## If [param propagate] is [code]true[/code], when [member chaining] is [code]true[/code], this
+## function will pass the arguments from the previous [Promise] in the [Promise] chain to the
+## next [Callable], instead of the output of this [Promise].
+## [br][br]
+## Also see [method catch] and [method then].
+func finally(async = null, propagate : bool = false) -> Promise:
+	var promise := Promise.new(StatusCoroutineLogic.new(async), propagate)
 	_chain_extention(_copy_status, promise, [false])
 	return promise
 ## Extends the [Promise] chain.[br]
 ## Returns a new [Promise] that is executed immediately after this [Promise] is rejected. If this
-## [Promise] is accepted instead, then the newly created [Promise] is also immediately accepted.[br]
-## If [member chaining] is [code]true[/code], the ouput of the perevious [Promise] in this [Promise]
-## chain will be pushed to the next.
+## [Promise] is accepted instead, then the newly created [Promise] is also immediately accepted.
 ## [br][br]
-## Also see [method execute].
-func catch(async = null) -> Promise:
-	var promise := Promise.new(ForceCoroutineLogic.new(async), false)
+## If [param propagate] is [code]true[/code], when [member chaining] is [code]true[/code], this
+## function will pass the arguments from the previous [Promise] in the [Promise] chain to the
+## next [Callable], instead of the output of this [Promise].
+## [br][br]
+## Also see [method then] and [method finally].
+func catch(async = null, propagate : bool = true) -> Promise:
+	var promise := Promise.new(ForceCoroutineLogic.new(async), propagate)
 	_chain_extention(_passthrough_at_desired, promise, [async, PromiseStatus.Rejected, true])
 	return promise
 ## Extends the [Promise] chain.[br]
 ## Returns a new [Promise] that is executed immediately after this [Promise] is accepted. If this
-## [Promise] is rejected instead, then the newly created [Promise] is also immediately rejected.[br]
-## If [member chaining] is [code]true[/code], the ouput of the perevious [Promise] in this [Promise]
-## chain will be pushed to the next.
+## [Promise] is rejected instead, then the newly created [Promise] is also immediately rejected.
 ## [br][br]
-## Also see [method execute].
-func then(async = null) -> Promise:
-	var promise := Promise.new(ForceCoroutineLogic.new(async), false)
+## If [param propagate] is [code]true[/code], when [member chaining] is [code]true[/code], this
+## function will pass the arguments from the previous [Promise] in the [Promise] chain to the
+## next [Callable], instead of the output of this [Promise].
+## [br][br]
+## Also see [method catch] and [method finally].
+func then(async = null, propagate : bool = true) -> Promise:
+	var promise := Promise.new(ForceCoroutineLogic.new(async), propagate)
 	_chain_extention(_passthrough_at_desired, promise, [async, PromiseStatus.Accepted, true])
 	return promise
 

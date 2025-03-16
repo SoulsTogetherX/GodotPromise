@@ -196,25 +196,29 @@ func chain(toggle : bool = true) -> Promise:
 ## Also see [method execute].
 func finally(async = null) -> Promise:
 	var promise := Promise.new(StatusCoroutineLogic.new(async), false)
-	_chain_extention(_copy_status, promise)
+	_chain_extention(_copy_status, promise, [false])
 	return promise
 ## Extends the [Promise] chain.[br]
 ## Returns a new [Promise] that is executed immediately after this [Promise] is rejected. If this
-## [Promise] is accepted instead, then the newly created [Promise] is also immediately accepted.
+## [Promise] is accepted instead, then the newly created [Promise] is also immediately accepted.[br]
+## If [member chaining] is [code]true[/code], the ouput of the perevious [Promise] in this [Promise]
+## chain will be pushed to the next.
 ## [br][br]
 ## Also see [method execute].
 func catch(async = null) -> Promise:
 	var promise := Promise.new(ForceCoroutineLogic.new(async), false)
-	_chain_extention(_passthrough_at_desired, promise, [async, PromiseStatus.Rejected])
+	_chain_extention(_passthrough_at_desired, promise, [async, PromiseStatus.Rejected, true])
 	return promise
 ## Extends the [Promise] chain.[br]
 ## Returns a new [Promise] that is executed immediately after this [Promise] is accepted. If this
-## [Promise] is rejected instead, then the newly created [Promise] is also immediately rejected.
+## [Promise] is rejected instead, then the newly created [Promise] is also immediately rejected.[br]
+## If [member chaining] is [code]true[/code], the ouput of the perevious [Promise] in this [Promise]
+## chain will be pushed to the next.
 ## [br][br]
 ## Also see [method execute].
 func then(async = null) -> Promise:
 	var promise := Promise.new(ForceCoroutineLogic.new(async), false)
-	_chain_extention(_passthrough_at_desired, promise, [async, PromiseStatus.Accepted])
+	_chain_extention(_passthrough_at_desired, promise, [async, PromiseStatus.Accepted, true])
 	return promise
 
 
@@ -227,33 +231,38 @@ func _chain_extention(call : Callable, promise : Promise, args : Array = []) -> 
 		call.call(get_result())
 		return
 	finished.connect(call)
-func _handle_chain(arg, promise : Promise) -> void:
+func _handle_chain(arg, propagate : bool, promise : Promise) -> void:
 	if chaining:
 		promise.chaining = true
-		if arg is Array:
-			promise._logic.bind(arg)
+		promise._logic._propagate = propagate
+		if _logic._propagate && !_logic._args.is_empty():
+			promise._logic.bind(_logic._args)
 		else:
-			promise._logic.bind([arg])
+			if arg is Array:
+				promise._logic.bind(arg)
+			else:
+				promise._logic.bind([arg])
 
-func _inline(input, promise : Promise) -> void:
-	_handle_chain(input, promise)
+func _inline(input, propagate : bool, promise : Promise) -> void:
+	_handle_chain(input, propagate, promise)
 	promise.execute()
-func _copy_status(input, promise : Promise) -> void:
+func _copy_status(input, propagate : bool, promise : Promise) -> void:
 	if promise._logic is StatusCoroutineLogic:
 		promise._logic.pass_status(get_status() == PromiseStatus.Accepted)
 	
-	_inline(input, promise)
+	_inline(input, propagate, promise)
 func _passthrough_at_desired(
 	input,
 	async,
 	desired_status : PromiseStatus,
+	propagate : bool,
 	promise : Promise,
 ) -> void:
 	if promise._logic is ForceCoroutineLogic:
 		var overwrite = async if get_status() == desired_status else input
 		promise._logic.pass_overwrite(overwrite)
 	
-	_copy_status(input, promise)
+	_copy_status(input, propagate, promise)
 
 
 	# <BASE CLASSES>
@@ -282,6 +291,7 @@ class AbstractLogic extends RefCounted:
 	var _tasks : Array[Task]
 	var _prev : Promise # Needed so Godot doesn't clear a chain of Promises Prematurely
 	var _status : PromiseStatus = PromiseStatus.Initialized
+	var _propagate : bool = false
 	var _promise = null
 	var _output = null
 	

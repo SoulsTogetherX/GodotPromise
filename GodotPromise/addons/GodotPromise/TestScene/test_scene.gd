@@ -226,9 +226,15 @@ func test_chain() -> void:
 		"Start test_chain()",
 		"\nOutput: ",
 		await Promise.new("Hello World").chain().finally(_test_chain_resolver).finished,
+		"\nOutput then and catch: ",
+		await Promise.new("Hello World").chain().then().catch().finally(_test_chain_resolver).finished,
+		"\nOutput finally: ",
+		await Promise.new("Hello World").chain().finally().finally(_test_chain_resolver).finished,
 		"\nEnd test_chain()\n",
 	)
-func _test_chain_resolver(arg : String) -> String:
+func _test_chain_resolver(arg) -> String:
+	if arg == null:
+		return "receieved no argument"
 	return "receieved argument '" + arg + "'"
 
 func test_next() -> void:

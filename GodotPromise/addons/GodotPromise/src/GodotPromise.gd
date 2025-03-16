@@ -122,7 +122,7 @@ static func any(promises : Array[Promise] = []) -> Promise:
 ## Unlike [method reject_direct], if [param async] is a coroutine, it will wait
 ## for it to finish.
 static func reject(async = null) -> Promise:
-	var logic := DirectCoroutineLogic.new(async)
+	var logic := StatusCoroutineLogic.new(async)
 	logic.pass_status(false)
 	return Promise.new(logic, true)
 ## Returns a [Promise] that is resolved and gives [param async] as the output.
@@ -131,7 +131,7 @@ static func reject(async = null) -> Promise:
 ## for it to finish. [br]
 ## Functionally, this is equalvent [method Promise.new].
 static func resolve(async = null) -> Promise:
-	var logic := DirectCoroutineLogic.new(async)
+	var logic := StatusCoroutineLogic.new(async)
 	logic.pass_status(true)
 	return Promise.new(logic, true)
 
@@ -191,11 +191,11 @@ func chain(toggle : bool = true) -> Promise:
 	return self
 ## Extends the [Promise] chain.[br]
 ## Returns a new [Promise] that is executed immediately after this [Promise] is finished, regardless
-## of if it is accepted or rejected.
+## of if it is accepted or rejected.[br]
 ## [br][br]
 ## Also see [method execute].
 func finally(async = null) -> Promise:
-	var promise := Promise.new(DirectCoroutineLogic.new(async), false)
+	var promise := Promise.new(StatusCoroutineLogic.new(async), false)
 	_chain_extention(_copy_status, promise)
 	return promise
 ## Extends the [Promise] chain.[br]
@@ -239,7 +239,7 @@ func _inline(input, promise : Promise) -> void:
 	_handle_chain(input, promise)
 	promise.execute()
 func _copy_status(input, promise : Promise) -> void:
-	if promise._logic is DirectCoroutineLogic:
+	if promise._logic is StatusCoroutineLogic:
 		promise._logic.pass_status(get_status() == PromiseStatus.Accepted)
 	
 	_inline(input, promise)
@@ -348,23 +348,37 @@ class AbstractLogic extends RefCounted:
 
 ## Base Class for Single Coroutine Promise Logic
 class DirectCoroutineLogic extends AbstractLogic:
-	var _status_process : Callable = resolve
+	func _init(promise) -> void:
+		_promise = promise
+	
+	func _execute() -> void:
+		connect_coroutine(_promise, _on_thread_finish)
+	func _on_thread_finish(output) -> void:
+		if _promise is Promise:
+			if _promise.get_status() == PromiseStatus.Rejected:
+				reject(output)
+				return
+		resolve(output)
+
+## Class for Status Coroutine Promise Logic
+class StatusCoroutineLogic extends AbstractLogic:
+	var _on_thread_finish : Callable = resolve
 	
 	func _init(promise) -> void:
 		_promise = promise
 	func _execute() -> void:
-		connect_coroutine(_promise, _status_process)
+		connect_coroutine(_promise, _on_thread_finish)
 	
 	func pass_status(accept : bool = true) -> void:
-		_status_process = resolve if accept else reject
+		_on_thread_finish = resolve if accept else reject
 ## Class for Force Coroutine Promise Logic
-class ForceCoroutineLogic extends DirectCoroutineLogic:
+class ForceCoroutineLogic extends StatusCoroutineLogic:
 	var _overwrite = null
 	func pass_overwrite(overwrite) -> void:
 		_overwrite = overwrite
 	
 	func _execute() -> void:
-		connect_coroutine(_overwrite, _status_process)
+		connect_coroutine(_overwrite, _on_thread_finish)
 
 ## Base Class for Multi Coroutine Promise Logic
 class MultiCoroutine extends AbstractLogic:

@@ -44,11 +44,16 @@ func all_tests_check() -> void:
 	
 	await test_chain()
 	
+	await test_next()
 	await test_finally()
+	
 	await test_catch()
 	await test_then()
 
 func test_new() -> void:
+	var promise := Promise.new(null).finally("Message")
+	await promise.finished
+	
 	print(
 		"Start test_new()",
 		"\n<null> Output: ",
@@ -60,7 +65,7 @@ func test_new() -> void:
 		"\n<Promise (Unfinished)> Output: ",
 		await Promise.new(Promise.new(timeout(0.1)).finally("Message")).finished,
 		"\n<Promise (Finished)> Output: ",
-		await Promise.new(Promise.new(null).finally("Message")).finished,
+		await Promise.new(promise).finished,
 		"\nEnd test_new()\n",
 	)
 
@@ -123,6 +128,8 @@ func test_reject() -> void:
 		"Start test_reject()",
 		"\nOutput: ",
 		await Promise.reject("Rejected").finished,
+		"\nOutput .new(): ",
+		await Promise.new(Promise.reject("Rejected")).finished,
 		"\nEnd test_reject()\n",
 	)
 func test_resolve() -> void:
@@ -130,6 +137,8 @@ func test_resolve() -> void:
 		"Start test_resolve()",
 		"\nOutput: ",
 		await Promise.resolve("Resolved").finished,
+		"\nOutput .new(): ",
+		await Promise.new(Promise.resolve("Rejected")).finished,
 		"\nEnd test_resolve()\n",
 	)
 
@@ -222,10 +231,26 @@ func test_chain() -> void:
 func _test_chain_resolver(arg : String) -> String:
 	return "receieved argument '" + arg + "'"
 
+func test_next() -> void:
+	var output : Array = await Promise.all([
+		Promise.reject("Rejected").next(Promise.resolve("Resolved")).then("Accepted").catch("Rejected"),
+		Promise.resolve("Resolved").next(Promise.reject("Rejected")).then("Accepted").catch("Rejected"),
+	]).finished
+	
+	print(
+		"Start test_next()",
+		"\nOutput Rejected to Accepted: ",
+		output[0],
+		"\nOutput Accepted to Rejected: ",
+		output[1],
+		"\nEnd test_next()\n",
+	)
 func test_finally() -> void:
 	var output : Array = await Promise.all([
 		Promise.reject("Rejected").then("Thened").finally("Test Rejected Output"),
 		Promise.resolve("Resolved").catch("Catched").finally("Test Resolved Output"),
+		Promise.reject("Rejected").finally(Promise.resolve("Resolved")).then("Accepted").catch("Rejected"),
+		Promise.resolve("Resolved").finally(Promise.reject("Rejected")).then("Accepted").catch("Rejected"),
 	]).finished
 	
 	print(
@@ -235,14 +260,23 @@ func test_finally() -> void:
 		output[0],
 		"\nTest on Resolved:\nOutput: ",
 		output[1],
+		"\nOutput Rejected to Accepted: ",
+		output[2],
+		"\nOutput Accepted to Rejected: ",
+		output[3],
 		"\nEnd test_finally()\n"
 	)
+
 func test_catch() -> void:
 	var output : Array = await Promise.all([
 		Promise.reject("Rejected").then("Thened").catch("Catched"),
 		Promise.resolve("Resolved").then("Thened").catch("Catched"),
 		Promise.reject("Resolved").then("Thened").catch("Catched").then("Thened"),
 		Promise.resolve("Resolved").then("Thened").catch("Catched").then("Thened"),
+		Promise.new(Promise.reject("Rejected")).then("Thened").catch("Catched"),
+		Promise.new(Promise.resolve("Resolved")).then("Thened").catch("Catched"),
+		Promise.new(Promise.reject("Resolved")).then("Thened").catch("Catched").then("Thened"),
+		Promise.new(Promise.resolve("Resolved")).then("Thened").catch("Catched").then("Thened"),
 	]).finished
 	
 	print(
@@ -255,6 +289,14 @@ func test_catch() -> void:
 		output[2],
 		"\nTest on Resolved x2:\nOutput: ",
 		output[3],
+		"\nTest on .new(Rejected):\nOutput: ",
+		output[4],
+		"\nTest on .new(Resolved):\nOutput: ",
+		output[5],
+		"\nTest on .new(Rejected) x2:\nOutput: ",
+		output[6],
+		"\nTest on .new(Resolved) x2:\nOutput: ",
+		output[7],
 		"\nEnd test_catch()\n"
 	)
 func test_then() -> void:
@@ -263,6 +305,10 @@ func test_then() -> void:
 		Promise.resolve("Resolved").catch("Catched").then("Thened"),
 		Promise.reject("Both").catch("Catched").then("Thened").catch("Catched"),
 		Promise.resolve("Both").catch("Catched").then("Thened").catch("Catched"),
+		Promise.new(Promise.reject("Rejected")).catch("Catched").then("Thened"),
+		Promise.new(Promise.resolve("Resolved")).catch("Catched").then("Thened"),
+		Promise.new(Promise.reject("Resolved")).catch("Catched").then("Thened").catch("Catched"),
+		Promise.new(Promise.resolve("Resolved")).catch("Catched").then("Thened").catch("Catched"),
 	]).finished
 	
 	print(
@@ -275,6 +321,14 @@ func test_then() -> void:
 		output[2],
 		"\nTest on Resolved x2:\nOutput: ",
 		output[3],
+		"\nTest on .new(Rejected):\nOutput: ",
+		output[4],
+		"\nTest on .new(Resolved):\nOutput: ",
+		output[5],
+		"\nTest on .new(Rejected) x2:\nOutput: ",
+		output[6],
+		"\nTest on .new(Resolved) x2:\nOutput: ",
+		output[7],
 		"\nEnd test_then()\n"
 	)
 

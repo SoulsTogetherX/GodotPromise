@@ -83,11 +83,11 @@ class HoldCoroutine extends DirectCoroutineLogic:
 		_unpause.emit()
 	
 	func _execute() -> void:
-		connect_coroutine(_promise, _on_thread_finish)
+		connect_coroutine(_promise, _on_promise_finish)
 		connect_coroutine(_interfere, emit_unpaused)
-	func _on_thread_finish(output) -> void:
+	func _on_promise_finish(output) -> void:
 		if !_unpaused_flag: await _unpause
-		_status_process.call(output)
+		_on_thread_finish.call(output)
 
 ## Class for Sort Coroutine Promise Logic
 class SortCoroutine extends AllCoroutine:

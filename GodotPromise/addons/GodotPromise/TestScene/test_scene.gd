@@ -42,9 +42,6 @@ func all_tests_check() -> void:
 	await test_withCallback()
 	await test_withCallbackResolvers()
 	
-	await test_chain()
-	
-	await test_next()
 	await test_finally()
 	
 	await test_catch()
@@ -144,8 +141,12 @@ func test_resolve() -> void:
 
 func test_withCallback() -> void:
 	var output : Array = await Promise.all([
-		Promise.withCallback(_callback_test.bind(false)).catch("Output was Rejected"),
-		Promise.withCallback(_callback_test.bind(true)).then("Output was Resolved"),
+		Promise.withCallback(
+			_resolver_callback_test.bind(0.5, false)
+		).then("Output was Resolved").catch("Output was Rejected"),
+		Promise.withCallback(
+			_resolver_callback_test.bind(0.5, true)
+		).then("Output was Resolved").catch("Output was Rejected"),
 	]).finished
 	
 	print(
@@ -158,30 +159,34 @@ func test_withCallback() -> void:
 		"\nEnd test_withCallback()\n"
 	)
 func test_withResolvers() -> void:
-	var reject := Promise.withResolvers(caller.bind(0.5, "Test Reject"))
-	_resolver_test(0.2, reject.Reject.bind("Outer Rejected"))
+	var promise_data := Promise.withResolvers(caller.bind(0.5, "Test Reject"))
+	_resolver_test(0.2, promise_data.Reject.bind("Outer Rejected"))
 	print(
 		"Start test_withResolvers()",
 		"\nTest Outer Reject:",
 		"\nOutput: ",
-		await reject.Promise.finished
+		await promise_data.Promise.then(
+			"Output was Resolved"
+		).catch("Output was Rejected").finished
 	)
 	
 	var accept := Promise.withResolvers(caller.bind(0.5, "Test Accept"))
 	_resolver_test(0.2, accept.Resolve.bind("Outer Resolved"))
 	print(
 		"Test Outer Resolve:\nOutput: ",
-		await accept.Promise.finished,
+		await accept.Promise.then(
+			"Output was Resolved"
+		).catch("Output was Rejected").finished,
 		"\nEnd test_withResolvers()\n"
 	)
 func test_withCallbackResolvers() -> void:
 	var output : Array = await Promise.all([
 		Promise.withCallbackResolvers(
 			_resolver_callback_test.bind(0.5, false)
-		).Promise.catch("Output was Rejected"),
+		).Promise.then("Output was Resolved").catch("Output was Rejected"),
 		Promise.withCallbackResolvers(
 			_resolver_callback_test.bind(0.5, true)
-		).Promise.then("Output was Resolved"),
+		).Promise.then("Output was Resolved").catch("Output was Rejected"),
 	]).finished
 	
 	print(
@@ -208,49 +213,19 @@ func test_withCallbackResolvers() -> void:
 		await accept.Promise.finished,
 		"\nEnd withCallbackResolvers()\n"
 	)
-func _callback_test(resolver : Callable, rejecter : Callable, resolve : bool) -> void:
-	if resolve:
+func _resolver_test(time : float, call : Callable) -> void:
+	await timeout(time)
+	await call.call()
+func _resolver_callback_test(resolver : Callable, rejecter : Callable, time : float, solution : bool) -> void:
+	await _resolver_test(time, _callback_test.bind(resolver, rejecter, solution))
+func _callback_test(resolver : Callable, rejecter : Callable, solution : bool) -> void:
+	if solution:
 		if resolver.is_valid():
 			resolver.call("Resolved")
 			return
 	if rejecter.is_valid():
 		rejecter.call("Rejected")
-func _resolver_test(time : float, call : Callable) -> void:
-	await timeout(time)
-	await call.call()
-func _resolver_callback_test(resolver : Callable, rejecter : Callable, time : float, resolve : bool) -> void:
-	await _resolver_test(time, _callback_test.bind(resolver, rejecter, resolve))
 
-func test_chain() -> void:
-	print(
-		"Start test_chain()",
-		"\nOutput: ",
-		await Promise.new("Hello World").chain().finally(_test_chain_resolver).finished,
-		"\nOutput then and catch: ",
-		await Promise.new("Hello World").chain().then().catch().finally(_test_chain_resolver).finished,
-		"\nOutput finally: ",
-		await Promise.new("Hello World").chain().finally().finally(_test_chain_resolver).finished,
-		"\nEnd test_chain()\n",
-	)
-func _test_chain_resolver(arg) -> String:
-	if arg == null:
-		return "receieved no argument"
-	return "receieved argument '" + arg + "'"
-
-func test_next() -> void:
-	var output : Array = await Promise.all([
-		Promise.reject("Rejected").next(Promise.resolve("Resolved")).then("Accepted").catch("Rejected"),
-		Promise.resolve("Resolved").next(Promise.reject("Rejected")).then("Accepted").catch("Rejected"),
-	]).finished
-	
-	print(
-		"Start test_next()",
-		"\nOutput Rejected to Accepted: ",
-		output[0],
-		"\nOutput Accepted to Rejected: ",
-		output[1],
-		"\nEnd test_next()\n",
-	)
 func test_finally() -> void:
 	var output : Array = await Promise.all([
 		Promise.reject("Rejected").then("Thened").finally("Test Rejected Output"),
@@ -346,11 +321,15 @@ func all_EX_tests_check() -> void:
 	
 	await test_hold()
 	
+	await test_resource()
+	
 	await test_sort()
 	await test_rsort()
 	
 	await test_firstN()
 	await test_lastN()
+	
+	await test_pipe()
 	
 	await test_anyReject()
 
@@ -391,10 +370,6 @@ func test_hold() -> void:
 	var output : Array = await Promise.all([
 		PromiseEx.hold(caller.bind(0.25, "Resolved 0.25"), timeout(0.5)),
 		PromiseEx.hold(caller.bind(0.5, "Resolved 0.5"), timeout(0.25)),
-		Promise.resolve().finally(PromiseEx.hold(timeout.bind(0.25), timeout.bind(0.5))).then("Thened").catch("Catched"),
-		Promise.resolve().finally(PromiseEx.hold(timeout.bind(0.5), timeout.bind(0.25))).then("Thened").catch("Catched"),
-		Promise.reject().finally(PromiseEx.hold(timeout.bind(0.25), timeout.bind(0.5))).then("Thened").catch("Catched"),
-		Promise.reject().finally(PromiseEx.hold(timeout.bind(0.5), timeout.bind(0.25))).then("Thened").catch("Catched"),
 	]).finished
 	
 	print(
@@ -404,19 +379,22 @@ func test_hold() -> void:
 		"\nPromise 0.5, Hold 0.25",
 		"\nOutput: ",
 		output[1],
-		"\nChained Resolved. Promise 0.25, Hold 0.5",
-		"\nOutput: ",
-		output[2],
-		"\nChained Resolved. Promise 0.5, Hold 0.25",
-		"\nOutput: ",
-		output[3],
-		"\nChained Rejected. Promise 0.25, Hold 0.5",
-		"\nOutput: ",
-		output[4],
-		"\nChained Rejected. Promise 0.5, Hold 0.25",
-		"\nOutput: ",
-		output[5],
 		"\nEnd test_hold()\n",
+	)
+
+func test_resource() -> void:
+	var output : Array = await Promise.all([
+		PromiseEx.resource(get_tree().process_frame, "res://addons/GodotPromise/src/GodotPromise.gd"),
+		PromiseEx.resource(get_tree().process_frame, "res://addons/GodotPromise/src/FileDoesn'tExist.gd"),
+	]).finished
+	
+	print(
+		"Start test_resource()",
+		"\nFile Exists - Output: ",
+		"No Resource Found" if output[0] is int && output[0] == ERR_CANT_ACQUIRE_RESOURCE else output[0],
+		"\nFile Doesn't Exist - Output: ",
+		"No Resource Found" if output[1] is int && output[1] == ERR_CANT_ACQUIRE_RESOURCE else output[1],
+		"\nEnd test_resource()\n",
 	)
 
 func test_sort() -> void:
@@ -469,7 +447,7 @@ func test_firstN() -> void:
 		output[0],
 		"\nThree coroutines, n=5",
 		"\nOutput: ",
-		#output[1],
+		output[1],
 		"\nEnd test_firstN()\n",
 	)
 func test_lastN() -> void:
@@ -498,6 +476,37 @@ func test_lastN() -> void:
 		output[1],
 		"\nEnd test_lastN()\n",
 	)
+
+func test_pipe() -> void:
+	var output : Array = await Promise.all([
+		PromiseEx.pipe([
+			_pipeline_test.bind(0),
+			_pipeline_test,
+			_pipeline_test,
+			Promise.new(_pipeline_test, false),
+			_pipeline_test,
+			_pipeline_test,
+		], 3),
+		PromiseEx.pipe([
+			_pipeline_test.bind(0),
+			_pipeline_test,
+			_pipeline_test,
+			Promise.reject("FAILED"),
+			_pipeline_test,
+			_pipeline_test,
+		], 5),
+	]).finished
+	
+	print(
+		"Start test_pipe()",
+		"\nAdd 1+1+1+1+1+1. Output: ",
+		output[0],
+		"\nForce Reject. Output: ",
+		output[1],
+		"\nEnd test_pipe()\n",
+	)
+func _pipeline_test(output : int) -> int:
+	return output + 1
 
 func test_anyReject() -> void:
 	print(

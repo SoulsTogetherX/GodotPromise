@@ -66,6 +66,12 @@ func execute() -> void:
 ## Also see [method execute].
 func reset() -> void:
 	_logic.reset()
+## Similar to [method reset], but resets all the [Promise] and all previous [Promise]s
+## executed in the [Promise[ chain.
+## [br][br]
+## Also see [method execute].
+func reset_chain() -> void:
+	_logic.reset_chain()
 
 ## Returns if the current [Promise] has finished.
 func is_finished() -> bool:
@@ -212,32 +218,49 @@ static func withCallbackResolvers(
 
 
 	# <PROMISE CHAIN EXTENSIONS FUNCTIONS>
-## Extends the [Promise] chain.[br]
-## Returns a new [Promise] that is executed immediately after this [Promise] is finished, regardless
-## of if it is accepted or rejected.[br]
+## Extends the [Promise] chain by returning a new [Promise] that is executed immediately
+## after this [Promise] is finished, regardless of if it is accepted or rejected.
+## [br]
+## If [param pipe_prev] is [code]true[/code], then the output of the previous [Promise] will be
+## used as a binded argument if the [param async] is a [Callable].
 ## [br][br]
-## Also see [method execute].
-func finally(async = null) -> Promise:
+## Also see [method execute] and [method Callable.bind].
+func finally(
+	async = null,
+	pipe_prev : bool = false
+) -> Promise:
 	var promise := Promise.new(StatusCoroutineLogic.new(async), false)
-	_chain_extention(_copy_status, promise._logic)
+	_chain_extention(_copy_status, promise._logic, [pipe_prev])
 	return promise
-## Extends the [Promise] chain.[br]
-## Returns a new [Promise] that is executed immediately after this [Promise] is rejected. If this
-## [Promise] is accepted instead, then the newly created [Promise] is also immediately accepted.
+## Extends the [Promise] chain by returning a new [Promise] that is executed immediately after
+## this [Promise] is rejected. If this [Promise] is accepted instead, then the newly created
+## [Promise] is also immediately accepted.
+## [br]
+## If [param pipe_prev] is [code]true[/code], then the output of the previous [Promise] will be
+## used as a binded argument if the [param async] is a [Callable].
 ## [br][br]
-## Also see [method execute].
-func catch(async = null) -> Promise:
+## Also see [method execute] and [method Callable.bind].
+func catch(
+	async = null,
+	pipe_prev : bool = false
+) -> Promise:
 	var promise := Promise.new(ForceCoroutineLogic.new(async), false)
-	_chain_extention(_passthrough_at_desired, promise._logic, [async, PromiseStatus.Rejected])
+	_chain_extention(_passthrough_at_desired, promise._logic, [async, PromiseStatus.Rejected, pipe_prev])
 	return promise
-## Extends the [Promise] chain.[br]
-## Returns a new [Promise] that is executed immediately after this [Promise] is accepted. If this
-## [Promise] is rejected instead, then the newly created [Promise] is also immediately rejected.
+## Extends the [Promise] chain by returning a new [Promise] that is executed immediately after
+## this [Promise] is accepted. If this [Promise] is rejected instead, then the newly created
+## [Promise] is also immediately rejected.
+## [br]
+## If [param pipe_prev] is [code]true[/code], then the output of the previous [Promise] will be
+## used as a binded argument if the [param async] is a [Callable].
 ## [br][br]
-## Also see [method execute].
-func then(async = null) -> Promise:
+## Also see [method execute] and [method Callable.bind].
+func then(
+	async = null,
+	pipe_prev : bool = false
+) -> Promise:
 	var promise := Promise.new(ForceCoroutineLogic.new(async), false)
-	_chain_extention(_passthrough_at_desired, promise._logic, [async, PromiseStatus.Accepted])
+	_chain_extention(_passthrough_at_desired, promise._logic, [async, PromiseStatus.Accepted, pipe_prev])
 	return promise
 
 
@@ -251,24 +274,34 @@ func _chain_extention(call : Callable, logic : AbstractLogic, args : Array = [])
 		return
 	finished.connect(call, CONNECT_ONE_SHOT)
 
-func _inline(_input, logic : AbstractLogic) -> void:
+func _inline(
+	input,
+	bind_input : bool,
+	logic : AbstractLogic,
+) -> void:
+	if bind_input: logic.bind(input)
 	logic.execute()
-func _copy_status(_input, logic : AbstractLogic) -> void:
+func _copy_status(
+	input,
+	bind_input : bool,
+	logic : AbstractLogic,
+) -> void:
 	if logic is StatusCoroutineLogic:
 		logic.pass_status(peek() == PromiseStatus.Accepted)
 	
-	_inline(_input, logic)
+	_inline(input, bind_input, logic)
 func _passthrough_at_desired(
 	input,
 	async,
 	desired_status : PromiseStatus,
+	bind_input : bool,
 	logic : AbstractLogic,
 ) -> void:
 	if logic is ForceCoroutineLogic:
 		var overwrite = async if peek() == desired_status else input
 		logic.pass_overwrite(overwrite)
 	
-	_copy_status(input, logic)
+	_copy_status(input, bind_input, logic)
 
 
 	# <BASE CLASSES>
@@ -333,6 +366,9 @@ class AbstractLogic extends RefCounted:
 		_tasks = []
 		_output = null
 		_status = PromiseStatus.Initialized
+	func reset_chain() -> void:
+		if _prev: _prev.reset_chain()
+		reset()
 	
 	## Binds an argument. These arguments will be used if this [Promise] is
 	## tasked with a [Callable].

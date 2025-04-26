@@ -17,8 +17,6 @@ static func interfere(
 ## Creates a [Promise] that attempts to resolve [param promise] and [param release] coroutines
 ## at the same time. However, this [Promise] will not resolve until [param release] has resolved
 ## first.
-## [br][br]
-## Also see [method hold].
 static func hold(
 	promise = null,
 	release = null,
@@ -96,7 +94,7 @@ static func lastN(
 
 
 ## Returns a [Promise] that finishes and returns the result of a pipline of coroutines. If the 
-## coroutine is a Callable, or a [Promise] taksed with a [Callable], the previous output
+## coroutine is a Callable, or a [Promise] tasked with a [Callable], the previous output
 ## in the chain will be binded to it as an argument.[br]
 ## If a [Promise] is rejected within the chain, this [Promise] will immediately reject that
 ## error and cancel all future methods in the pipeline.

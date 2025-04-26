@@ -226,12 +226,17 @@ func _callback_test(resolver : Callable, rejecter : Callable, solution : bool) -
 	if rejecter.is_valid():
 		rejecter.call("Rejected")
 
+func _pipe_test_funcs(arg : int) -> int:
+	return arg * 2
 func test_finally() -> void:
 	var output : Array = await Promise.all([
 		Promise.reject("Rejected").then("Thened").finally("Test Rejected Output"),
 		Promise.resolve("Resolved").catch("Catched").finally("Test Resolved Output"),
 		Promise.reject("Rejected").finally(Promise.resolve("Resolved")).then("Accepted").catch("Rejected"),
 		Promise.resolve("Resolved").finally(Promise.reject("Rejected")).then("Accepted").catch("Rejected"),
+		Promise.new(1).finally(_pipe_test_funcs, true),
+		Promise.new(Promise.reject(1)).finally(_pipe_test_funcs, true).finally(_pipe_test_funcs, true).finally(_pipe_test_funcs, true),
+		Promise.new(1).finally(_pipe_test_funcs, true).finally(_pipe_test_funcs, true).finally(_pipe_test_funcs, true),
 	]).finished
 	
 	print(
@@ -245,6 +250,12 @@ func test_finally() -> void:
 		output[2],
 		"\nOutput Accepted to Rejected: ",
 		output[3],
+		"\nPipeline X1 (Resolved): ",
+		output[4],
+		"\nPipeline X3 (Reject): ",
+		output[5],
+		"\nPipeline X3 (Resolved): ",
+		output[6],
 		"\nEnd test_finally()\n"
 	)
 
@@ -258,6 +269,9 @@ func test_catch() -> void:
 		Promise.new(Promise.resolve("Resolved")).then("Thened").catch("Catched"),
 		Promise.new(Promise.reject("Resolved")).then("Thened").catch("Catched").then("Thened"),
 		Promise.new(Promise.resolve("Resolved")).then("Thened").catch("Catched").then("Thened"),
+		Promise.new(Promise.reject(1)).catch(_pipe_test_funcs, true),
+		Promise.new(Promise.resolve(1)).catch(_pipe_test_funcs, true).catch(_pipe_test_funcs, true).catch(_pipe_test_funcs, true),
+		Promise.new(Promise.reject(1)).catch(_pipe_test_funcs, true).catch(_pipe_test_funcs, true).catch(_pipe_test_funcs, true),
 	]).finished
 	
 	print(
@@ -278,6 +292,12 @@ func test_catch() -> void:
 		output[6],
 		"\nTest on .new(Resolved) x2:\nOutput: ",
 		output[7],
+		"\nPipeline X1 (Rejected): ",
+		output[8],
+		"\nPipeline X3 (Resolved): ",
+		output[9],
+		"\nPipeline X3 (Rejected): ",
+		output[10],
 		"\nEnd test_catch()\n"
 	)
 func test_then() -> void:
@@ -290,6 +310,9 @@ func test_then() -> void:
 		Promise.new(Promise.resolve("Resolved")).catch("Catched").then("Thened"),
 		Promise.new(Promise.reject("Resolved")).catch("Catched").then("Thened").catch("Catched"),
 		Promise.new(Promise.resolve("Resolved")).catch("Catched").then("Thened").catch("Catched"),
+		Promise.new(1).then(_pipe_test_funcs, true),
+		Promise.new(Promise.reject(1)).then(_pipe_test_funcs, true).then(_pipe_test_funcs, true).then(_pipe_test_funcs, true),
+		Promise.new(1).then(_pipe_test_funcs, true).then(_pipe_test_funcs, true).then(_pipe_test_funcs, true),
 	]).finished
 	
 	print(
@@ -310,6 +333,12 @@ func test_then() -> void:
 		output[6],
 		"\nTest on .new(Resolved) x2:\nOutput: ",
 		output[7],
+		"\nPipeline X1 (Resolved): ",
+		output[8],
+		"\nPipeline X3 (Rejected): ",
+		output[9],
+		"\nPipeline X3 (Resolved): ",
+		output[10],
 		"\nEnd test_then()\n"
 	)
 

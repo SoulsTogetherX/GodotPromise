@@ -28,7 +28,8 @@ var _logic : AbstractLogic
 
 	# <OVERWRITED OBJECT FUNCTIONS>
 ## Constructor function of the [Promise] class.[br]
-## The parameter [param async] is the value for the promise to resolve.[br]
+## The parameter [param async] is the value for the promise to resolve. If [param async] is a [Promise]
+## it will be executed, if not already executed, when this [Promise] is called the execute.[br]
 ## If [param executeOnStart] is [code]true[/code], then the promise will immediately call [method execute].
 func _init(
 	async = null,
@@ -366,6 +367,9 @@ class AbstractLogic extends RefCounted:
 		_tasks = []
 		_output = null
 		_status = PromiseStatus.Initialized
+		
+		if _promise is Promise:
+			_promise.reset()
 	func reset_chain() -> void:
 		if _prev: _prev.reset_chain()
 		reset()
@@ -388,6 +392,8 @@ class AbstractLogic extends RefCounted:
 			if promise.is_finished():
 				process.call(promise.get_result())
 				return
+			if promise.peek() == PromiseStatus.Initialized:
+				promise.execute()
 			promise.finished.connect(process, CONNECT_ONE_SHOT)
 			return
 		

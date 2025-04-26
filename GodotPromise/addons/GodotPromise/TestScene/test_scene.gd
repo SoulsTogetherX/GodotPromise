@@ -49,7 +49,10 @@ func all_tests_check() -> void:
 
 func test_new() -> void:
 	var promise := Promise.new(null).finally("Message")
+	var external := Promise.new(timeout(0.1), false).finally("Message")
+	
 	await promise.finished
+	timeout(1).connect(external.execute)
 	
 	print(
 		"Start test_new()",
@@ -59,10 +62,14 @@ func test_new() -> void:
 		await Promise.new(timeout(0.1)).finished,
 		"\n<Callable> Output: ",
 		await Promise.new(caller.bind(0.1, "Message")).finished,
+		"\n<Promise (Unexecuted, Unfinished)> Output: ",
+		await Promise.new(Promise.new(timeout(0.1), false).finally("Message")).finished,
 		"\n<Promise (Unfinished)> Output: ",
 		await Promise.new(Promise.new(timeout(0.1)).finally("Message")).finished,
 		"\n<Promise (Finished)> Output: ",
 		await Promise.new(promise).finished,
+		"\n<Promise (External Resolve)> Output: ",
+		await Promise.new(external.finished).finished,
 		"\nEnd test_new()\n",
 	)
 

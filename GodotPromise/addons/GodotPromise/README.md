@@ -59,15 +59,15 @@ await Promise.resolve_raw(val).finished
 You may also chain Promises.
 ```
 print(
-    await Promise.any([val1, val2, val3, val4]).then(
-        "At least one coroutine was resolved"
-    ).then(
-        "A coroutine was accepted! :O"
-    ).catch(
-        "All coroutines were rejected! O:"
-    ).finally(
-        "I always run!!! :D"
-    ).finished
+	await Promise.any([val1, val2, val3, val4]).then(
+		"At least one coroutine was resolved"
+	).then(
+		"A coroutine was accepted! :O"
+	).catch(
+		"All coroutines were rejected! O:"
+	).finally(
+		"I always run!!! :D"
+	).finished
 )
 ```
 
@@ -77,7 +77,7 @@ func _pipe_test_funcs(arg : int) -> int:
 	return arg * 2
 
 print(
-    Promise.new(1).then(_pipe_test_funcs, true).then(_pipe_test_funcs, true).then(_pipe_test_funcs, true)
+	Promise.new(1).then(_pipe_test_funcs, true).then(_pipe_test_funcs, true).then(_pipe_test_funcs, true)
 ) <- Returns 8
 ```
 

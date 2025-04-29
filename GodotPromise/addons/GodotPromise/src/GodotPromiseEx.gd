@@ -169,6 +169,7 @@ class ResourceCoroutine extends OnSignalCoroutine:
 		cache_mode : ResourceLoader.CacheMode = 1,
 	) -> void:
 		super(sig)
+		_promise = "Resource<%s>" % [resource_name]
 		_resource_name = resource_name
 		_type_hint = type_hint
 		_use_sub_threads = use_sub_threads

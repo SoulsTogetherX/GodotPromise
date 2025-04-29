@@ -392,8 +392,7 @@ class AbstractLogic extends RefCounted:
 			if promise.is_finished():
 				process.call(promise.get_result())
 				return
-			if promise.peek() == PromiseStatus.Initialized:
-				promise.execute()
+			_execute_promise_chain(promise)
 			promise.finished.connect(process, CONNECT_ONE_SHOT)
 			return
 		
@@ -409,6 +408,11 @@ class AbstractLogic extends RefCounted:
 		task.finished.connect(process, CONNECT_ONE_SHOT)
 		task.execute()
 		_tasks.append(task)
+	func _execute_promise_chain(promise : Promise) -> void:
+		while promise.get_prev():
+			promise = promise.get_prev()
+		if promise.peek() == PromiseStatus.Initialized:
+			promise.execute()
 	
 	## Overwrite this method to create custom execute logic
 	func _execute() -> void: pass

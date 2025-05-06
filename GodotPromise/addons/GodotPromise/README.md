@@ -81,6 +81,64 @@ print(
 ) <- Returns 8
 ```
 
+## Common mistakes
+
+Note that Promise is a complex object, so it's easy to misuse.
+
+You'd expect the below code to work, for instance...
+```
+func test() -> Signal:
+	return Promise.new().finished
+```
+...but this actually causes an error.
+
+Promise is a RefCounter object. This means that, in a siduation where reference to the Promise is no longer stored anywhere, the Promise will automatically clear itself. Reference to it's finished signal does not count.
+
+To fix this, you must store the Promise somehow...
+```
+var p : Promise
+func test() -> Signal:
+	p = Promise.new()
+	return p.finished
+```
+...or return the Promise itself...
+```
+func test() -> Promise:
+	return Promise.new()
+```
+
+It is also to fix up how to delay Promises.
+
+Look at the below code...
+```
+func test() -> void:
+	p = Promise.new()
+	for n in 10:
+		p.then(get_tree().create_timer(0.1).timeout)
+	await p.finished
+```
+At first glace, it appears that this function will await for exactly '0.1 * 10' seconds. However, no. It waits for exactly 0.1 seconds.
+
+This is because you are creating all 'get_tree().create_timer(0.1)' in the same frame. These timers will all finish `0.1` seconds later, regardless of what happens, and the Promises respect that.
+
+Instead, you need to create and await the timers on the fly. For example...
+```
+func _test_helper() -> void:
+	await get_tree().create_timer(0.1).timeout
+func test() -> void:
+	p = Promise.new()
+	for n in 10:
+		p.then(_test_helper)
+	await p.finished
+```
+This will work and await for exactly `0.1 * 10` seconds, as the timers are being created and awaited on demand.
+
+It's also easy to confuse Callables with Return values.
+
+In 'Promise.new(print("Hello"))`, we are promising the return value of `print`, which is interpreted as `null`.
+
+Meanwhile, in 'Promise.new(print.bind("Hello"))`, we are promising the Callable `print`, which will be callabled when the Promise needs it to be called.
+
 For more information, the documention includes a full list of functions and utlity. And, as stated, the MAIN purpose of this framework is to allow user customizability. No matter your requirement, it will be easy to code a custom Promise protocol to handle it when using this framework.
 
 Enjoy.

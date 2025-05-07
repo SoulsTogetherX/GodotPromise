@@ -132,9 +132,9 @@ func test() -> void:
 	await p.finished
 ```
 
-At first glace, it appears that this function will await for exactly `0.1 * 10` seconds. However, no. It waits for exactly 0.1 seconds.
+At first glace, it appears that this function will await for exactly `0.1 * 10` seconds. However, no. It waits for exactly `0.1` seconds.
 
-This is because you are creating all `get_tree().create_timer(0.1)` in the same frame. These timers will all finish `0.1` seconds later, regardless of what happens, and the Promises respect that.
+This is because you are creating all `get_tree().create_timer(0.1)` in the same frame. These timers will all finish `0.1` seconds later, regardless of what happens, and the `Promise`s respect that.
 
 Instead, you need to create and await the timers on the fly. For example...
 
@@ -144,17 +144,19 @@ func _test_helper() -> void:
 func test() -> void:
 	p = Promise.new()
 	for n in 10:
-		p.then(_test_helper)
+		p = p.then(_test_helper)
 	await p.finished
 ```
 
 This will work and await for exactly `0.1 * 10` seconds, as the timers are being created and awaited on demand.
 
-It's also easy to confuse Callables with Return values.
+Please also note that `p`, in the above code, only refers to the last `Promise` in the `Promise` chain above, instead of the first. This does not trigger `RefCounted` to clear the previous `Promises` as they are internally referenced in `p` for you.
+
+It's also easy to confuse `Callable`s with `Return` values.
 
 In `Promise.new(print("Hello"))`, we are promising the return value of `print`, which is interpreted as `null`.
 
-Meanwhile, in `Promise.new(print.bind("Hello"))`, we are promising the Callable `print`, which will be callabled when the Promise needs it to be called.
+Meanwhile, in `Promise.new(print.bind("Hello"))`, we are promising the Callable `print`, which will be called only when the Promise needs it to be called.
 
 For more information, the documention includes a full list of functions and utlity. And, as stated, the MAIN purpose of this framework is to allow user customizability. No matter your requirement, it will be easy to code a custom Promise protocol to handle it when using this framework.
 

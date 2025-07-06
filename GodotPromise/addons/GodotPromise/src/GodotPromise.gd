@@ -1,10 +1,10 @@
-# Made by Xavier Alvarez. A part of the "GodotPromise" Godot addon.
+# Made by Xavier Alvarez. A part of the "GodotPromise" Godot addon. @2025
 @icon("res://addons/GodotPromise/assets/GodotPromise.svg")
 @tool
 class_name Promise extends RefCounted
 ## A class used to coordinate coroutines
 
-
+#region Signals
 ## Emitted when [Promise] is Accepted or Rejected.
 signal finished(output)
 ## Emitted when [Promise] is Accepted or Rejected. Returns the output of the [Promise]
@@ -14,8 +14,10 @@ signal finished_status(output, status : PromiseStatus)
 signal accepted(output)
 ## Emitted when [Promise] is Rejected.
 signal rejected(output)
+#endregion
 
 
+#region Enums
 ## Current Status of the Promise
 enum PromiseStatus {
 	Initialized = 0, ## The promise hasn't yet been executed
@@ -23,10 +25,15 @@ enum PromiseStatus {
 	Accepted = 2, ## The promise is finished and accepted
 	Rejected = 3 ## The promise is finished, but rejected
 }
+#endregion
 
+
+#region Private Variables
 var _logic : AbstractLogic
+#endregion
 
-	# <OVERWRITED OBJECT FUNCTIONS>
+
+#region Private Virtual Methods
 ## Constructor function of the [Promise] class.[br]
 ## The parameter [param async] is the value for the promise to resolve. If [param async] is a [Promise]
 ## it will be executed, if not already executed, when this [Promise] is called the execute.[br]
@@ -42,21 +49,13 @@ func _init(
 	
 	_logic.finished.connect(_finish_return)
 	if executeOnStart: execute()
-func _finish_return(output) -> void:
-	var status := peek()
-	
-	finished.emit(output)
-	finished_status.emit(output, status)
-	
-	if status == PromiseStatus.Accepted:
-		accepted.emit(output)
-		return
-	rejected.emit(output)
+
 func _to_string() -> String:
 	return "Promise<" + str(get_promise_object()) + ">"
+#endregion
 
 
-	# <USER ACCESS FUNCTIONS>
+#region Public Methods
 ## Starts the resolving process of the [Promise]. Does nothing if this [Promise] has already
 ## executed.
 func execute() -> void:
@@ -91,9 +90,10 @@ func get_promise_object():
 ## finished. Also see [method is_finished].
 func get_result():
 	return _logic.get_output()
+#endregion
 
 
-	# <PROMISE CREATION FUNCTIONS>
+#region Static Promise Creation Methods
 ## Returns a [Promise] of all coroutines, sorting their outputs in an [Array], and finishes
 ## only when all coroutines have finished.
 static func all(
@@ -179,7 +179,7 @@ static func resolve_raw(
 
 
 ## Returns a [Promise] based on an async [Callable]. Uses the [method Callable.bind] method
-## to bind two [Callable]s to resolve and reject the [Promise], respectfully. 
+## to bind two [Callable]s to resolve and reject the [Promise], respectfully.
 static func withCallback(
 	async : Callable,
 	executeOnStart : bool = true
@@ -216,9 +216,10 @@ static func withCallbackResolvers(
 		"Resolve": logic.resolve,
 		"Reject": logic.reject
 	}
+#endregion
 
 
-	# <PROMISE CHAIN EXTENSIONS FUNCTIONS>
+#region Promise Chain Extensions Methods
 ## Extends the [Promise] chain by returning a new [Promise] that is executed immediately
 ## after this [Promise] is finished, regardless of if it is accepted or rejected.
 ## [br]
@@ -263,9 +264,10 @@ func then(
 	var promise := Promise.new(ForceCoroutineLogic.new(async), false)
 	_chain_extention(_passthrough_at_desired, promise._logic, [async, PromiseStatus.Accepted, pipe_prev])
 	return promise
+#endregion
 
 
-	# <HELPER FUNCTIONS>
+#region Helper Private Methods
 func _chain_extention(call : Callable, logic : AbstractLogic, args : Array = []) -> void:
 	logic._prev = self
 	call = call.bind(logic).bindv(args)
@@ -305,7 +307,20 @@ func _passthrough_at_desired(
 	_copy_status(input, bind_input, logic)
 
 
-	# <BASE CLASSES>
+func _finish_return(output) -> void:
+	var status := peek()
+	
+	finished.emit(output)
+	finished_status.emit(output, status)
+	
+	if status == PromiseStatus.Accepted:
+		accepted.emit(output)
+		return
+	rejected.emit(output)
+#endregion
+
+
+#region Inner Classes
 ## BASE Class for ALL Promise Logic
 class AbstractLogic extends RefCounted:
 	signal finished(output)
@@ -538,3 +553,6 @@ class AnyCoroutine extends ArrayCoroutine:
 		
 		if _counter == 0:
 			resolve(_outputs)
+#endregion
+
+# Made by Xavier Alvarez. A part of the "GodotPromise" Godot addon. @2025

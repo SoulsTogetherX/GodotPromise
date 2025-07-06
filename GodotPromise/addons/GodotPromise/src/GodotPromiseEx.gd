@@ -1,10 +1,10 @@
-# Made by Xavier Alvarez. A part of the "GodotPromise" Godot addon.
+# Made by Xavier Alvarez. A part of the "GodotPromise" Godot addon. @2025
 @icon("res://addons/GodotPromise/assets/GodotPromiseEx.svg")
 @tool
 class_name PromiseEx extends Promise
 ## An extension to the [Promise] class to showcase how easy it is to create custom [Promise] behavior.
 
-	# <PROMISE CREATION FUNCTIONS>
+#region Static Promise Creation Methods
 ## Requests two coroutines that race. If [param promise] finishes first, this [Promise] is accepted.
 ## If [param interfere] finishes first, this [Promise] is rejected.[br]
 ## If the coroutines end at the same time, [param promise] has the priority.
@@ -117,10 +117,11 @@ static func anyReject(
 	executeOnStart : bool = true
 ) -> Promise:
 	return Promise.new(AnyRejectCoroutine.new(promises), executeOnStart)
+#endregion
 
 
-	# <BASE CLASSES>
-## Class for Interfere Coroutine Promise Logic
+#region Inner Classes
+# Class for Interfere Coroutine Promise Logic
 class InterfereCoroutine extends DirectCoroutineLogic:
 	var _interfere
 	
@@ -284,3 +285,6 @@ class AnyRejectCoroutine extends ArrayCoroutine:
 		
 		if _counter == 0:
 			resolve(_outputs)
+#endregion
+
+# Made by Xavier Alvarez. A part of the "GodotPromise" Godot addon. @2025

@@ -1,16 +1,18 @@
-# Made by Xavier Alvarez. A part of the "GodotPromise" Godot addon.
+# Made by Xavier Alvarez. A part of the "GodotPromise" Godot addon. @2025
 @tool
 extends Control
 
+#region External Variables
 @export var start_tests : bool:
 	set(val):
 		start_tests = val
 		
 		if is_node_ready():
 			await all_check()
+#endregion
 
 
-	# <HELPER FUNCTIONS>
+#region Helper Methods
 func timeout(time : float) -> Signal:
 	return get_tree().create_timer(time).timeout
 func caller(time : float, message : String) -> String:
@@ -23,9 +25,10 @@ func all_check() -> void:
 	await all_tests_check()
 	await all_EX_tests_check()
 	print("Check Finished")
+#endregion
 
 
-	# <PROMISE>
+#region Promise Test Methods
 func all_tests_check() -> void:
 	await test_new()
 	
@@ -348,10 +351,10 @@ func test_then() -> void:
 		output[10],
 		"\nEnd test_then()\n"
 	)
+#endregion
 
 
-
-	# <PROMISE EX>
+#region	PromiseEx Test Methods
 func all_EX_tests_check() -> void:
 	await test_interfere()
 	
@@ -557,3 +560,6 @@ func test_anyReject() -> void:
 		]).finished,
 		"\nEnd test_anyReject()\n",
 	)
+#endregion
+
+# Made by Xavier Alvarez. A part of the "GodotPromise" Godot addon. @2025

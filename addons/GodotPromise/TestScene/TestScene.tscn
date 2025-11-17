@@ -6,4 +6,3 @@
 layout_mode = 3
 anchors_preset = 0
 script = ExtResource("1_1pxhs")
-start_tests = true

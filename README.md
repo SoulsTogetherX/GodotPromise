@@ -1,28 +1,34 @@
-# SUMMARY
+# GodotPromise
 
 Hello everyone in the future!
 
-I've noticed the current Promise types on the Godot Asset Library to be lacking in a few ways, so I improved them.
+I've noticed the current Promise types on the Godot Asset Library are lacking in a few ways, so I improved on them.
+
+## Features 
 
 I replicated **_ALL_** functions related to the [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) type in Javascript (except try(), but that's because its behavior is implied by default).
 
-Promises can be accepted or rejected. then(), catch(), and finally() functions work as expected with this.
+Promises can be accepted or rejected. then(), catch(), and finally() functions work as expected.
 
-This type works for Signals, Callables, other Promises, and **_EVERY_** other type.
+This type works for any **_asynchronous_** type (Signals, Callables, other Promises), as well as synchronous types.
 
 The function to_string() converts the Promise into the format "Promise\<Type\>".
 
 It is possible and _recommended_ to chain Promises.
 
-It is fully documented, and the code is efficient and compact to help with easy understanding.
+It is **fully documented**, and the code is efficient and compact to help with easy understanding.
 
 I made it easy to create custom Promise functionality with the use of modular Inner Classes.
 
 Can be mindlessly plugged in to synchronize coroutines or be easily extended to allow **_anything_** else you may need by extending from the Inner Classes at the bottom of the document.
 
-# CODE EXAMPLES
+## Known Issues
 
-To use, simply create a Promise type as such:
+None
+
+## CODE EXAMPLES
+
+To use, simply create and await on a Promise type as such:
 
 ```
 await Promise.new(val).finished
@@ -87,7 +93,7 @@ print(
 ) # <- Returns 8
 ```
 
-## Common mistakes
+### Common mistakes
 
 Note that Promise is a complex object, so it's easy to misuse.
 
@@ -100,7 +106,7 @@ func test() -> Signal:
 
 ...but this actually causes an error.
 
-Promise is a RefCounter object. This means that, in a situation where reference to a Promise is no longer stored anywhere, the Promise will automatically clear itself.
+Promise is a RefCounter object. This means that, in a situation where the reference to a Promise is no longer stored anywhere, the Promise will automatically clear itself.
 
 To fix this, you must store the Promise somehow...
 
@@ -116,6 +122,9 @@ func test() -> Signal:
 ```
 func test() -> Promise:
 	return Promise.new()
+
+func main() -> void:
+	await test().finished
 ```
 
 It is also to easy to mess up how to delay Promises.
@@ -134,21 +143,22 @@ At first glance, it appears that this function will await for exactly `0.1 * 10`
 
 This is because you are creating all `get_tree().create_timer(0.1)` in the same frame. These timers will all finish `0.1` seconds later, regardless of what happens, and the Promises respect that.
 
-Instead, you need to create and await the timers on the fly. For example...
+Instead, you need to create and await the timers on demand. For example...
 
 ```
-func _test_helper() -> void:
+func test_helper() -> void:
 	await get_tree().create_timer(0.1).timeout
+
 func test() -> void:
 	p = Promise.new()
 	for n in 10:
-		p.then(_test_helper)
+		p.then(test_helper)
 	await p.finished
 ```
 
 This will work and await for exactly `0.1 * 10` seconds, as the timers are being created and awaited on demand.
 
-It's also easy to confuse Callables with Return values.
+It's also easy to confuse Callables with return values.
 
 In `Promise.new(print("Hello"))`, we are promising the return value of `print`, after it’s execution, which is interpreted as `null`.
 

@@ -5,14 +5,14 @@ func _enter_tree() -> void:
 	add_custom_type(
 		"GodotPromise",
 		"RefCounted",
-		preload("res://addons/GodotPromise/src/GodotPromise.gd"),
-		preload("res://addons/GodotPromise/assets/GodotPromise.svg")
+		load("uid://co0qail5t6ki6"),
+		load("uid://k5shot7mo40d")
 	)
 	add_custom_type(
 		"GodotPromiseEx",
 		"RefCounted",
-		preload("res://addons/GodotPromise/src/GodotPromiseEx.gd"),
-		preload("res://addons/GodotPromise/assets/GodotPromiseEx.svg")
+		load("uid://beymcq10l761i"),
+		load("uid://d0rvuugj5wsqt")
 	)
 func _exit_tree() -> void:
 	remove_custom_type("GodotPromise")

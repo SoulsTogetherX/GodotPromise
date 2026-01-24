@@ -3,12 +3,7 @@
 extends Control
 
 #region External Variables
-@export var start_tests : bool:
-	set(val):
-		start_tests = val
-		
-		if is_node_ready():
-			await all_check()
+@export_tool_button("Test Promises") var check_action = all_check;
 #endregion
 
 

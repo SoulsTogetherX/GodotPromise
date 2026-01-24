@@ -167,3 +167,6 @@ Meanwhile, in `Promise.new(print.bind("Hello"))`, we are promising the Callable 
 For more information, the documentation includes a full list of functions and utility. And, as stated, the MAIN purpose of this framework is to allow user customizability. No matter your requirement, it will be easy to code a custom Promise protocol to handle it when using this framework.
 
 Enjoy.
+
+## Profile
+If you like what I do, check out my [other stuff](https://ko-fi.com/soulstogether). Maybe buy me a coffee, if you want.

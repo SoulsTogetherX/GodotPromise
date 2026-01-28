@@ -23,7 +23,8 @@ enum PromiseStatus {
 	Initialized = 0, ## The promise hasn't yet been executed
 	Pending = 1, ## The promise has been executed, but not finished
 	Accepted = 2, ## The promise is finished and accepted
-	Rejected = 3 ## The promise is finished, but rejected
+	Rejected = 3, ## The promise is finished, but rejected
+	Canceled = 4  ## The promise's execution is skipped/canceled
 }
 #endregion
 
@@ -63,15 +64,19 @@ func execute() -> void:
 ## Resets the the [Promise] so it can resolve/reject the given task again. If called while
 ## the task is pending, the task is cancled.
 ## [br][br]
-## Also see [method execute].
-func reset() -> void:
+## If [param auto_execute] is [code]true[/code], the first [Promise] will also
+## have [method execute] called on it.
+func reset(auto_execute : bool = false) -> void:
 	_logic.reset()
+	if auto_execute:
+		_logic.execute()
 ## Similar to [method reset], but resets all the [Promise] and all previous [Promise]s
-## executed in the [Promise[ chain.
+## executed in the [Promise] chain.
 ## [br][br]
-## Also see [method execute].
-func reset_chain() -> void:
-	_logic.reset_chain()
+## If [param auto_execute] is [code]true[/code], the first [Promise] in the chain will also
+## have [method execute] called on it.
+func reset_chain(auto_execute : bool = false) -> void:
+	_logic.reset_chain(auto_execute)
 
 ## Returns if the current [Promise] has finished.
 func is_finished() -> bool:
@@ -131,7 +136,6 @@ static func any(
 ) -> Promise:
 	return Promise.new(AnyCoroutine.new(promises), executeOnStart)
 
-
 ## Returns a [Promise] that is rejected and gives [param async] as the reason.
 ## [br][br]
 ## Unlike [method reject_direct], if [param async] is a coroutine, it will wait
@@ -140,8 +144,8 @@ static func reject(
 	async = null,
 	executeOnStart : bool = true
 ) -> Promise:
-	var logic := StatusCoroutineLogic.new(async)
-	logic.pass_status(false)
+	var logic := OverrideStatusCoroutineLogic.new(async)
+	logic.pass_status(PromiseStatus.Rejected)
 	return Promise.new(logic, executeOnStart)
 ## Returns a [Promise] that is resolved and gives [param async] as the output.
 ## [br][br]
@@ -152,8 +156,8 @@ static func resolve(
 	async = null,
 	executeOnStart : bool = true
 ) -> Promise:
-	var logic := StatusCoroutineLogic.new(async)
-	logic.pass_status(true)
+	var logic := OverrideStatusCoroutineLogic.new(async)
+	logic.pass_status(PromiseStatus.Accepted)
 	return Promise.new(logic, executeOnStart)
 
 ## Returns a [Promise] that is rejected and gives [param async] as the reason.
@@ -187,7 +191,7 @@ static func withCallback(
 	var logic := DirectCoroutineLogic.new(null)
 	logic._promise = async.bind(logic.resolve, logic.reject)
 	return Promise.new(logic, executeOnStart)
-## Returns an object including a [Promise], based on an async [Callable], a function to resolve
+## Returns an object including a [Promise] - based on an async [Callable] - a function to resolve
 ## the [Promise], and a function to reject the [Promise].
 static func withResolvers(
 	async = null,
@@ -199,7 +203,7 @@ static func withResolvers(
 		"Resolve": logic.resolve,
 		"Reject": logic.reject
 	}
-## Returns an object including a [Promise], based on an async [Callable], a function to resolve
+## Returns an object including a [Promise] - based on an async [Callable] - a function to resolve
 ## the [Promise], and a function to reject the [Promise]. Also uses the [method Callable.bind]
 ## method to bind two [Callable]s to resolve and reject the [Promise], respectfully.
 ## [br][br]
@@ -231,8 +235,8 @@ func finally(
 	async = null,
 	pipe_prev : bool = false
 ) -> Promise:
-	var promise := Promise.new(StatusCoroutineLogic.new(async), false)
-	_chain_extention(_copy_status, promise._logic, [pipe_prev])
+	var promise := Promise.new(OverrideStatusCoroutineLogic.new(async), false)
+	_chain_extention(_transfer_status, promise._logic, [pipe_prev])
 	return promise
 ## Extends the [Promise] chain by returning a new [Promise] that is executed immediately after
 ## this [Promise] is rejected. If this [Promise] is accepted instead, then the newly created
@@ -240,14 +244,18 @@ func finally(
 ## [br]
 ## If [param pipe_prev] is [code]true[/code], then the output of the previous [Promise] will be
 ## used as a binded argument if the [param async] is a [Callable].
+## [br]
+## If [param is_stopgate] is [code]true[/code], then nothing else except [method finally] will
+## execute in the [Promise] chain's future if previous [Promise] was resolved.
 ## [br][br]
 ## Also see [method execute] and [method Callable.bind].
 func catch(
 	async = null,
-	pipe_prev : bool = false
+	pipe_prev : bool = false,
+	is_stopgate : bool = true
 ) -> Promise:
-	var promise := Promise.new(ForceCoroutineLogic.new(async), false)
-	_chain_extention(_passthrough_at_desired, promise._logic, [async, PromiseStatus.Rejected, pipe_prev])
+	var promise := Promise.new(OverrideStatusCoroutineLogic.new(async, is_stopgate), false)
+	_chain_extention(_overwrite_at_desired, promise._logic, [async, PromiseStatus.Rejected, pipe_prev])
 	return promise
 ## Extends the [Promise] chain by returning a new [Promise] that is executed immediately after
 ## this [Promise] is accepted. If this [Promise] is rejected instead, then the newly created
@@ -255,14 +263,18 @@ func catch(
 ## [br]
 ## If [param pipe_prev] is [code]true[/code], then the output of the previous [Promise] will be
 ## used as a binded argument if the [param async] is a [Callable].
+## [br]
+## If [param is_stopgate] is [code]true[/code], then nothing else except [method finally] will
+## execute in the [Promise] chain's future if previous [Promise] was rejected.
 ## [br][br]
 ## Also see [method execute] and [method Callable.bind].
 func then(
 	async = null,
-	pipe_prev : bool = false
+	pipe_prev : bool = false,
+	is_stopgate : bool = false
 ) -> Promise:
-	var promise := Promise.new(ForceCoroutineLogic.new(async), false)
-	_chain_extention(_passthrough_at_desired, promise._logic, [async, PromiseStatus.Accepted, pipe_prev])
+	var promise := Promise.new(OverrideStatusCoroutineLogic.new(async, is_stopgate), false)
+	_chain_extention(_overwrite_at_desired, promise._logic, [async, PromiseStatus.Accepted, pipe_prev])
 	return promise
 #endregion
 
@@ -277,34 +289,39 @@ func _chain_extention(call : Callable, logic : AbstractLogic, args : Array = [])
 		return
 	finished.connect(call, CONNECT_ONE_SHOT)
 
-func _inline(
-	input,
-	bind_input : bool,
-	logic : AbstractLogic,
-) -> void:
-	if bind_input: logic.bind(input)
-	logic.execute()
-func _copy_status(
-	input,
-	bind_input : bool,
-	logic : AbstractLogic,
-) -> void:
-	if logic is StatusCoroutineLogic:
-		logic.pass_status(peek() == PromiseStatus.Accepted)
-	
-	_inline(input, bind_input, logic)
-func _passthrough_at_desired(
+
+func _overwrite_at_desired(
 	input,
 	async,
 	desired_status : PromiseStatus,
 	bind_input : bool,
-	logic : AbstractLogic,
+	logic : AbstractLogic
 ) -> void:
-	if logic is ForceCoroutineLogic:
-		var overwrite = async if peek() == desired_status else input
-		logic.pass_overwrite(overwrite)
+	if peek() == desired_status:
+		if bind_input:
+			logic.bind(input)
+		
+		if logic is OverrideStatusCoroutineLogic:
+			if logic.is_stopgate():
+				logic.pass_status(PromiseStatus.Canceled)
+			else:
+				logic.pass_status(peek())
+		
+		logic.execute()
+		return
 	
-	_copy_status(input, bind_input, logic)
+	logic.overwrite(input, peek())
+func _transfer_status(
+	input,
+	bind_input : bool,
+	logic : AbstractLogic
+) -> void:
+	if logic is OverrideStatusCoroutineLogic:
+		logic.pass_status(peek())
+	
+	if bind_input:
+		logic.bind(input)
+	logic.execute()
 
 
 func _finish_return(output) -> void:
@@ -361,6 +378,11 @@ class AbstractLogic extends RefCounted:
 		_status = PromiseStatus.Accepted
 		_output = output
 		_emit_finished.call_deferred(output)
+	func overwrite(output, status : PromiseStatus) -> void:
+		_tasks = []
+		_status = status
+		_output = output
+		_emit_finished.call_deferred(output)
 	
 	func is_finished() -> bool:
 		return _status >= PromiseStatus.Accepted
@@ -385,9 +407,12 @@ class AbstractLogic extends RefCounted:
 		
 		if _promise is Promise:
 			_promise.reset()
-	func reset_chain() -> void:
-		if _prev: _prev.reset_chain()
+	func reset_chain(auto_execute : bool = false) -> void:
 		reset()
+		if _prev:
+			_prev.reset_chain()
+		elif auto_execute:
+			execute()
 	
 	## Binds an argument. These arguments will be used if this [Promise] is
 	## tasked with a [Callable].
@@ -449,24 +474,25 @@ class DirectCoroutineLogic extends AbstractLogic:
 		resolve(output)
 
 ## Class for Status Coroutine Promise Logic
-class StatusCoroutineLogic extends AbstractLogic:
-	var _on_thread_finish : Callable = resolve
+class OverrideStatusCoroutineLogic extends AbstractLogic:
+	var _status_override : PromiseStatus
+	var _is_stopgate : bool = false
 	
-	func _init(promise) -> void:
+	func _init(promise, is_stopgate : bool = false) -> void:
 		_promise = promise
+		_is_stopgate = is_stopgate
 	func _execute() -> void:
-		connect_coroutine(_promise, _on_thread_finish)
+		connect_coroutine(_promise, _final_output)
 	
-	func pass_status(accept : bool = true) -> void:
-		_on_thread_finish = resolve if accept else reject
-## Class for Force Coroutine Promise Logic
-class ForceCoroutineLogic extends StatusCoroutineLogic:
-	var _overwrite = null
-	func pass_overwrite(overwrite) -> void:
-		_overwrite = overwrite
+	func _final_output(output) -> void:
+		_status = _status_override
+		_output = output
+		_emit_finished.call_deferred(output)
 	
-	func _execute() -> void:
-		connect_coroutine(_overwrite, _on_thread_finish)
+	func pass_status(status : PromiseStatus) -> void:
+		_status_override = status
+	func is_stopgate() -> bool:
+		return _is_stopgate
 
 ## BASE Class for OnSignal Frame Coroutine Promise Logic
 class OnSignalCoroutine extends AbstractLogic:
@@ -505,7 +531,8 @@ class MultiCoroutine extends AbstractLogic:
 		for idx : int in range(0, _promise.size()):
 			connect_coroutine(_promise[idx], _on_thread_finish.bind(idx))
 	## Overwrite this method to create custom thread logic
-	func _on_thread_finish(output, _index : int) -> void: pass
+	func _on_thread_finish(output, _index : int) -> void:
+		pass
 ## Class for Race Coroutine Promise Logic
 class RaceCoroutine extends MultiCoroutine:
 	func _on_thread_finish(output, _index : int) -> void:

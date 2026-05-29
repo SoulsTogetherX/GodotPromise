@@ -2,7 +2,7 @@
 
 Hello everyone in the future!
 
-I've noticed the current Promise types on the Godot Asset Library are lacking in a few ways, so I improved on them.
+I made this addon to hopefully improve how people use async Callables and Signals.
 
 ## Godot Promise Vs ECMAScript Comparison
 
@@ -11,9 +11,10 @@ All features of the [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaS
 This section will provide a few notable comparisons to help you understand.
 
 ### Creating Promises
+
 #### Base Constructor
 
-In **ECMAScript**, there is only one proper way to create a promise.
+In `ECMAScript`, there is only one proper way to construct a promise.
 
 ```
 var promise = new Promise(resolve => resolve(obj));
@@ -21,9 +22,9 @@ var promise = new Promise(resolve => resolve(obj));
 
 This will create a `Promise` that will **resolve** to the value `obj`. (More information on **rejecting** and **resolving** will be given in a later section.)
 
-It is also important to note that if we removed the `obj`, such that the method `resolve` wasn't given *any* parameters, the ECMAScript Promise would return a default `undefined`.
+It is also important to note that if we removed the `obj`, such that the method `resolve` wasn't given _any_ parameters, the ECMAScript Promise would return a default `undefined`.
 
-In **Godot**, however, there are multiple ways to define a `Godot Promise`.
+In **Godot**, however, there are multiple ways to construct a `Godot Promise`.
 
 ```
 # Base 'Godot Promise' constructor
@@ -34,7 +35,7 @@ The above code will create a basic `Godot Promise` that automatically **resolves
 
 #### Receiving Output from Promises
 
-In **ECMAScript**, you can get a `Promise`'s output via the available `then`, `catch`, and `finally` chain methods. On the other hand, `Godot Promises` has a few different ways to get the ouput.
+In `ECMAScript`, you can get a ` Godot Promise`'s output via the available `then`, `catch`, and `finally` chain methods. On the other hand, `Godot Promises` has a few different ways to get the output.
 
 Firstly, `Godot Promises` automatically return their finished value via the `finished` `Signal`. If you want to get the value of a `Godot Promise` after it is **resolved** or **rejected**, you just `await` like so:
 
@@ -43,7 +44,7 @@ Firstly, `Godot Promises` automatically return their finished value via the `fin
 var val = await Promise.new(obj).finished
 ```
 
-You can also get the output using the `get_result` method.
+You can also get the output using the `get_result()` method.
 
 ```
 var p := Promise.new(obj)
@@ -51,19 +52,19 @@ await p.finished
 var val = p.get_result()
 ```
 
-*Note*: If `get_result` is called before the `Promise` has **resolved** or **rejected**, it will return a default `null` value. You can use the method `is_finished` to check if the `Promise` is `finished`.
+_Note_: If `get_result()` is called before the `Godot Promise` has **resolved** or **rejected**, it will return a default `null` value. You can use the method `is_finished()` to check if a `Promise` is `finished`.
 
-*Note*: All output processing of a `Godot Promise` happens in the defer section of the frame.
+_Technical Info_: All output processing of a `Godot Promise` happens in the defer section of the frame.
 
-It is also important to note that if we removed the `obj`, such that the Promise's constructor wasn't given *any* parameters, the `finished` signal would also return a default `null.`
+It is also important to note that if we removed the `obj`, such that the Promise's constructor wasn't given _any_ parameters, the `finished` signal would also return a default `null.`
 
 As can already be seen, `Godot Promise` uses `null` in place of `ECMAScript`'s `undefined`.
 
 #### Auto Async Parameter Awaiting
 
-*One more thing to notice*: this constructor works differently depending on what `obj` is.
+_One more thing to notice_: this constructor works differently depending on what it’s given constructor argument is.
 
-If `obj` is **NOT** either a `Signal`, `Callable`, or another `Godot Promise`, the `Godot Promise` will instantly return the raw parameter as given.
+If `obj` is **NOT** a `Signal`, `Callable`, or another `Godot Promise`, the `Godot Promise` will not defer the result and immediately return the raw parameter as given.
 Otherwise, the `Godot Promise` will automatically `await` for the `Signal`, `Callable`, or `Godot Promise` to finish before then returning the result.
 
 For example:
@@ -71,8 +72,8 @@ For example:
 ```
 Signal test(param : String)
 val foo := func():
-	await get_tree().create_timer(1.0).timeout
-	return "Hello"
+    await get_tree().create_timer(1.0).timeout
+    return "Hello"
 
 # Resolves to "Hello" instantly
 await Promise.new("Hello").finished
@@ -87,35 +88,35 @@ await Promise.new(test).finished
 await Promise.new(Promise.new("Hello")).finished
 ```
 
-*Note*: `Callables` and `Signal` in a `Godot Promise` -- with no return value -- will output the default `null`.
+_Note_: `Callable` and `Signal` types -- with no return value -- will output the default `null` after processing in a `Godot Promise`
 
-As noticed, this is largely different from **ECMAScript**'s Promises, which do not automatically resolve async parameters given to it.
+As noticed, this is largely different from `ECMAScript`'s Promises, which do not automatically resolve async parameters given to it.
 
 ```
-// Creates a 'Promise' that returns an unresolved 'Promise' (that will resolve by itself in 1 second). 
+// Creates a 'Promise' that returns an unresolved 'Promise' (that will resolve by itself in 1 second).
 const myPromise = new Promise((resolve, reject) => {
-	return new Promise((resolve, reject) => {
-	    setTimeout(() => {
-	      // Resolve the promise with a value
-	      resolve("Data retrieved successfully!");
-	    }, 1000);
-	  });
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+          // Resolve the promise with a value
+          resolve("Data retrieved successfully!");
+        }, 1000);
+      });
   });
 ```
 
-To do something similar in `Godot Promise`, you may want to use the `reject_raw` or `resolve_raw` methods. These static methods will automatically construct a `Godot Promise` that either **resolves** or **rejects** to the raw value of any parameter given. As these `Godot Promises` do not resolve anything `async`, they will always return a value the moment they are *executed*.
+To do something similar in `Godot Promise`, you may want to use the `reject_raw()` or `resolve_raw()` methods. These static methods will automatically construct a `Godot Promise` that either **resolves** or **rejects** to the raw value of any parameter given. As these `Godot Promises` do not resolve anything `async`, they will always return a value the moment they are _executed_ (without deferring).
 
-When using them, an equivalent **Godot Promise** to the above `ECMAScript` example would be.
+When using them, a `Godot Promise` equivalent to the above `ECMAScript` example would be:
 
 ```
-# Will reject a 'Godot Promise` that resolves 'null' after 1 second. 
+# Will reject a 'Godot Promise` that resolves 'null' after 1 second.
 await Promise.reject_raw(Promise.new(get_tree().create_timer(1.0).timeout)).finished
 
 # Will resolve a 'Godot Promise` that resolves 'null' after 1 second.
 await Promise.resolve_raw(Promise.new(get_tree().create_timer(1.0).timeout)).finished
 ```
 
-Of course, there are also corresponding `reject` and `resolve` methods as well.
+Of course, there are also corresponding `reject()` and `resolve()` methods as well.
 
 ```
 # Will reject 'null' after 1 second.
@@ -125,20 +126,20 @@ await Promise.reject(Promise.new(get_tree().create_timer(1.0).timeout)).finished
 await Promise.resolve(Promise.new(get_tree().create_timer(1.0).timeout)).finished
 ```
 
-These methods *also* automatically `await` for `async` parameters to finish, similar to the base `Promise.new()` constructor. However, `Promise.new()` will always **resolve** `obj`, while `reject` will **reject** `obj`.
+These methods _also_ automatically `await` for `async` parameters to finish, similar to the base `Promise.new()` constructor. However, `Promise.new()` will always **resolve** `obj`, while `reject` will always **reject** `obj`.
 
-The `resolve` is added only for consistency.
+`resolve()` is functionally identical to `Promise.new()` and was only added for consistency.
 
 #### Stall Execution
 
-In **Godot Promise**, you can also place an additional `boolean` parameter to defer a `Godot Promise`, stalling it from executing. For example:
+In `Godot Promise`, you can also use an additional `boolean` parameter to defer a `Godot Promise`, stalling it from executing. For example:
 
 ```
-# Parameter version of basic 'Godot Promise' constructor 
+# Parameter version of basic 'Godot Promise' constructor
 Promise.new(async : Variant, executeOnStart)
 ```
 
-*Note*: If `executeOnStart` is `false`, then the `Godot Promise` will not run the moment it is constructed. To make it run after stalling it, you must use the `execute` method. For example:
+_Note_: If `executeOnStart` is `false`, then the `Godot Promise` will not run the moment it is constructed. To make it run after stalling, you must use the `execute()` method. For example:
 
 ```
 # Will not execute or await anything async on construction.
@@ -148,7 +149,7 @@ var val = Promise.new(obj, false)
 val.execute()
 ```
 
-This is much simpler than the **ECMAScript** equivalent.
+This is much simpler than the `ECMAScript` equivalent.
 
 ```
 function createDeferredPromise() {
@@ -183,7 +184,7 @@ promise.then((result) => {
 resolve("Success value!");
 ```
 
-Of course, all previous **Godot Promise** methods also have a corresponding `executeOnStart` parameter too.
+Of course, all previous `Godot Promise` methods also have a corresponding `executeOnStart` parameter too.
 
 ```
 # Won't resolve or reject when constructed
@@ -220,11 +221,11 @@ val.execute()
 await val.finished
 ```
 
-*Note*: for `Godot Promise` chains (referred to later), make sure to use `reset_chain` instead.
+_Note_: for `Godot Promise` chains (referred to later), make sure to use `reset_chain` instead.
 
 #### Callbacks and Resolvers
 
-Lastly, you might have noticed that the above `Godot Promise` constructors only either **resolve** or **reject** statically (decided on compilation), with no ability to change during runtime based on the parameters. This is very lacking compared to **ECMAScript**. For example:
+Lastly, you might have noticed that the above `Godot Promise` constructors only either **resolve** or **reject** statically (decided on compilation), with no ability to change during runtime based on the parameters. This is very lacking compared to `ECMAScript`. For example:
 
 ```
 // Resolves or rejects if the `resolve` or `reject` lambdas are called inside the `Promise`.
@@ -234,23 +235,21 @@ new Promise((resolve, reject) => {
    else reject()
 })
 
-
 // Resolves or rejects if the `resolve` or `reject` lambdas are called outside the 'Promise'.
 const { promise, resolve, reject } = Promise.withResolvers()
 // Depends on the variable 'ok'
 if (ok) resolve()
 else reject()
 
-
 // Resolves or rejects if the `resolveCallback` or `rejectCallback` lambdas are called inside or outside the `Promise`.
 let resolveCallback, rejectCallback;
 const promise = new Promise((resolve, reject) => {
-	resolveCallback = resolve;
-	rejectCallback = reject;
-	
+    resolveCallback = resolve;
+    rejectCallback = reject;
+
     // Depends on the variable 'ok'
-	if (ok) resolve()
-	else reject()
+    if (ok) resolve()
+    else reject()
 });
 
 // Depends on the variable 'ok'
@@ -258,18 +257,17 @@ if (ok) resolveCallback()
 else rejectCallback()
 ```
 
-To emulate this, use the **Godot Promise** equivalents `withCallback`, `withResolvers`, or `withCallbackResolvers`.
+To emulate this, use the `Godot Promise` equivalents `withCallback`, `withResolvers`, or `withCallbackResolvers`.
 
 ```
 # Resolves or rejects if the `resolve` or `reject` lambdas are called inside the `Promise`.
 var promise := Promise.withCallback(func (resolve, reject):
-	# Since we cannot invoke a callable like a normal function, we need to use `.call()` manually.
-	
-	# Depends on the variable 'ok'
-	if ok: resolve.call()
-	else: reject.call()
-)
+    # Since we cannot invoke a callable like a normal function, we need to use `.call()` manually.
 
+    # Depends on the variable 'ok'
+    if ok: resolve.call()
+    else: reject.call()
+)
 
 # Resolves or rejects if the `resolve` or `reject` lambdas are called outside the 'Promise'.
 var resolvers := Promise.withResolvers()
@@ -282,13 +280,12 @@ var reject: Callable = resolvers["reject"]
 if ok: resolve.call()
 else: reject.call()
 
-
 # Resolves or rejects if the `resolve` or `reject` lambdas are called inside or outside the `Promise`.
 var resolvers := Promise.withCallbackResolvers(func (resolve, reject):
-	# Since we cannot invoke a callable like a normal function, we need to use `.call()` manually.
-	# Depends on the variable 'ok'
-	if ok: resolve.call()
-	else: reject.call()
+    # Since we cannot invoke a callable like a normal function, we need to use `.call()` manually.
+    # Depends on the variable 'ok'
+    if ok: resolve.call()
+    else: reject.call()
 )
 # Since we cannot deconstruct a dictionary in GDScript, this function returns a Dictionary of everything relevant.
 var promise: Promise = resolvers["promise"]
@@ -312,7 +309,7 @@ func do_some_thing() -> Promise:
    return Promise.withCallback(_executor)
 ```
 
-And for consistency, these methods also also have a corresponding `executeOnStart` parameter.
+And for consistency, these methods also have a corresponding `executeOnStart` parameter.
 
 ```
 # Private Class Callback Callable
@@ -334,7 +331,7 @@ p1.execute()
 
 For simplicity, we also have a few other basic built-in constructors for your needs.
 
-Here are some methods in **ECMAScript**:
+Here are some methods in `ECMAScript`:
 
 ```
 const p1 = new Promise()
@@ -378,7 +375,9 @@ Pretty similar, right?
 
 #### Try Constructor
 
-*Note*: Unless you purposefully use an `assert`, `Godot` already continues after errors. Therefore, the `try-catch` pattern is implied by default.
+_Note_: Unless you purposefully use an `assert`, `Godot` already continues after errors. Therefore, the `try-catch` cannot be implemented exactly according to `ECMAScript` standards.
+
+Instead, it is recommended to code your own error handling instead of relying on exceptions.
 
 ### Promise Chains
 
@@ -386,7 +385,7 @@ Pretty similar, right?
 
 `Promise Chains` are defined as the situation where `Promises` are delayed execution and only trigger when the previous `Promise` (within the chain) is finished.
 
-In **ECMAScript**, this is trivial with its `then`, `catch`, and `finally` methods. For example:
+In `ECMAScript`, this is trivial with its `then`, `catch`, and `finally` methods. For example:
 
 ```
 const promise = new Promise(resolve => resolve());
@@ -408,7 +407,7 @@ promise
   .finally(() => console.log(3));
 ```
 
-Similarly, you have access to `then`, `catch`, and `finally` methods in **Godot Promise** as well.
+Similarly, you have access to `then`, `catch`, and `finally` methods in `Godot Promise` as well.
 
 ```
 # Will print to log 1, 2, and then 3
@@ -422,31 +421,32 @@ Promise.reject().catch(print.bind(1)).catch(print.bind(2)).finally(print.bind(3)
 
 #### Then and Catch Parameters
 
-Notice that the `Promise Chain`s for both `ECMAScript` and `Godot Promise` stops at the first `catch` statement, but runs for every then statement.
+Notice that the `Promise Chain`s for both `ECMAScript` and `Godot Promise` stops at the first `catch` statement, yet continues through every `then` statement.
 
-You can actually change this in `Godot Promise` via its arguments.
+You can actually change this via the methods’ arguments.
 
 ```
 # Parameter version of 'Godot Promise''s `then`, `catch`, and `finally` methods.
 Promise.new().then(async = null, pipe_prev : bool = false)
 Promise.new().then(async = null, pipe_prev : bool = false, is_stopgate : bool = false)
 Promise.new().catch(async = null, pipe_prev : bool = false, is_stopgate : bool = true)
- ```
+```
 
 This is where `Godot Promise` provides more customizability than `ECMAScript`.
 
-*Note*:\
-1. The `Godot Promise` output (in a chain) will be binded (as an Callable parameter) to the next `then` or `catch` `Godot Promise` in the chain (if it's a Callable) *ONLY IF* `pipe_prev` is `true`.\
-2. The previous `Godot Promise` output will cancel all following `Godot Promise`s in the chain *ONLY IF* `is_stopgate` is `true` and an unexpected status is found in the previous `Godot Promise` of the chain.
+_Note_:
+
+1. When `pipe_prev` is `true`, then the previous output of the previous `Godot Promise` (within the current promise chain) will be binded to the current `Godot Promise`’s argument as a Callable argument. This only works if the current `Godot Promise` is given a `Callable` to await on.
+2. If `is_stopgate` is `true`, then the previous `Godot Promise` output will cancel all following `Godot Promise`’s in the chain if an unexpected status is found in the previous `Godot Promise` of the chain. “Unexpected” means **Rejected** for ` then` method or **Resolved** for ` catch` method.
 
 With these parameters, you can flip the purpose of `then` and `catch` whenever needed.
 
 ```
 # Will print to log 1 and then 3
 Promise.resolve().then(
-	print.bind(1), false, true
+    print.bind(1), false, true
 ).then(
-	print.bind(2), false, true
+    print.bind(2), false, true
 ).finally(print.bind(3))
 
 ## Notice that finally still runs.
@@ -455,15 +455,15 @@ Promise.resolve().then(
 ```
 # Will print to log 1, 2, and then 3
 Promise.reject().catch(
-	print.bind(1), false, false
+    print.bind(1), false, false
 ).catch(
-	print.bind(2), false, false
+    print.bind(2), false, false
 ).finally(print.bind(3))
 
 ## Notice that finally still runs.
 ```
 
-...or, you can prevent the result of some `Promises` from messing up other `Callables`.
+...or, you can prevent the result of some `Godot Promise`s from interacting with other `Callables`.
 
 ```
 var c1 := func(): return
@@ -475,13 +475,13 @@ Promise.new().then(c1, false).then(c2, true)
 Promise.new().then(c1, false).then(c2, false)
 ```
 
-*Note*: Although piping from `Promise` to `Promise` is a standard feature in **ECMAScript**, attempting to bind arguments to a `Callable` (that doesn't ask for parameters) in `Godot` causes an error. Thus, to avoid common errors, `pipe_prev` is defaulted to `false`. Use it only when you need to.
+_Note_: Although piping from `Promise` to `Promise` is a standard feature in `ECMAScript`, attempting to bind arguments to a `Callable` (that doesn't ask for parameters) in `Godot` causes an error. Thus, to avoid common errors, `pipe_prev` is defaulted to `false`. Use it only when you need to.
 
 #### Split Chains
 
 Keep in mind you can also split `Promises`.
 
-In **ECMAScript**...
+In `ECMAScript`...
 
 ```
 const promise = new Promise((resolve) => resolve());
@@ -495,7 +495,7 @@ promise.then(() => {
 });
 ```
 
-...and in **Godot Promise**...
+...and in `Godot Promise`...
 
 ```
 var promise := Promise.new()
@@ -513,17 +513,17 @@ All possible `statuses` a `Promise` can have are shown in the documentation:
 
 ```
 enum PromiseStatus {
-	Initialized = 0, ## The promise hasn't yet been executed
-	Pending = 1, ## The promise has been executed, but not finished
-	Accepted = 2, ## The promise is finished and accepted
-	Rejected = 3, ## The promise is finished, but rejected
-	Canceled = 4  ## The promise's execution is skipped/canceled
+    Initialized = 0, ## The promise hasn't yet been executed
+    Pending = 1, ## The promise has been executed, but not finished
+    Accepted = 2, ## The promise is finished and accepted
+    Rejected = 3, ## The promise is finished, but rejected
+    Canceled = 4  ## The promise's execution is skipped/canceled
 }
 ```
 
-You may also use `get_prev` to get the previous `Godot Promise` in the `Godot Promise` chain.
+You may also use `get_prev()` to get the previous `Godot Promise` in the `Godot Promise` chain.
 
-Also, to reset a `Godot Promise Chain`, you use `reset_chain` instead of `reset`.
+Also, to reset a `Godot Promise Chain`, you use `reset_chain()` instead of `reset()`.
 
 ```
 var p1 := Promise.new().then().then().then()
@@ -535,11 +535,11 @@ p1.reset_chain() # Resets all promises before and including the head (the entire
 
 ### Common mistakes
 
-*Note*: that Promise is a complex object, so it's easy to misuse.
+_Note_: that Promise is a complex object, so it's easy to misuse.
 
 ### reset_chain()
 
-After attempting to `reset_chain`, you may want to execute the `method` again, like so:
+After attempting to `reset_chain()`, you may want to execute the `Godot Promise` again, like so:
 
 ```
 var p := Promise.new().then().then().catch().then()
@@ -574,7 +574,7 @@ await p.finished
 
 p.reset_chain()
 while p.get_prev() != null:
-	p = p.get_prev()
+    p = p.get_prev()
 p.execute()
 ```
 
@@ -586,16 +586,15 @@ When using `Godot Promise`, you might want to return the `finished` output of th
 
 ```
 func _test() -> Signal:
-	return Promise.new().finished
+    return Promise.new().finished
 
 func other_test() -> void:
-	await _test()
+    await _test()
 ```
 
 However, this will cause an error.
 
 `Promise` is a `RefCounter` object. This means that, in a situation where the reference to a `Godot Promise` is no longer stored anywhere, the `Godot Promise` will automatically clear itself, which will clear the `Signal` too. Hence, the `error` when attempting to use the `signal`.
-
 
 To fix this, you must store the Promise somehow...
 
@@ -603,46 +602,47 @@ To fix this, you must store the Promise somehow...
 var p : Promise
 
 func _test() -> Signal:
-	p = Promise.new().finished
-	return p
+    p = Promise.new().finished
+    return p
 
 func other_test() -> void:
-	await _test()
+    await _test()
 ```
 
 ...or return the Promise itself...
 
 ```
 func _test() -> Promise:
-	return Promise.new()
+    return Promise.new()
 
 func other_test() -> void:
-	await _test().finished
+    await _test().finished
 ```
 
-This may appear ugly, but it's something needed for the object to be automatically cleaned.
+This may appear ugly, but it's something needed for the object to be automatically constructed and destroyed.
 
 #### Promise Chain Refs
 
-*Note*: `Godot Promises` can store a reference to the previous `Godot Promise` in a `Godot Promise Chain`, but they do not store a reference to the next `Godot Promise` in a chain.
+_Note_: `Godot Promises` can store a reference to the previous `Godot Promise` in a `Godot Promise Chain`, but they do not store a reference to the next `Godot Promise` in a chain.
 
 For example:
+
 ```
 func _test_1() -> Promise:
-	var p := Promise.new(1)
-	p.then(2)
-	return p
+    var p := Promise.new(1)
+    p.then(2)
+    return p
 
 func _test_2() -> Promise:
-	return Promise.new(1).then(2)
+    return Promise.new(1).then(2)
 
-func other_test-1() -> void:
-	// Outputs 1
-	await _test_1().finished
+func other_test_1() -> void:
+    // Outputs 1
+    await _test_1().finished
 
 func other_test_2() -> void:
-	// Outputs 2
-	await _test_2().finished
+    // Outputs 2
+    await _test_2().finished
 ```
 
 ### Promises And Timers
@@ -651,13 +651,13 @@ Look at the code below...
 
 ```
 func test() -> void:
-	p = Promise.new()
-	for n in 10:
-		p.then(get_tree().create_timer(0.1).timeout)
-	await p.finished
+    p = Promise.new()
+    for n in 10:
+        p.then(get_tree().create_timer(0.1).timeout)
+    await p.finished
 ```
 
-At first glance, it appears that this function will await for exactly `0.1 * 10` seconds. However, no. It waits for exactly `0.1` seconds.
+At first glance, it appears that this function will `await` for exactly `0.1 * 10` seconds. However, no. It waits for exactly `0.1` seconds only.
 
 This is because you are creating all `get_tree().create_timer(0.1)` in the same frame. These timers will all finish `0.1` seconds later, regardless of what happens, and the `Godot Promises` respect that.
 
@@ -665,20 +665,20 @@ Instead, you need to create and `await` the timers on demand. For example...
 
 ```
 func test_helper() -> void:
-	await get_tree().create_timer(0.1).timeout
+    await get_tree().create_timer(0.1).timeout
 
 func test() -> void:
-	p = Promise.new()
-	for n in 10:
-		p.then(test_helper)
-	await p.finished
+    p = Promise.new()
+    for n in 10:
+        p.then(test_helper)
+    await p.finished
 ```
 
-This will work and `await` for exactly `0.1 * 10` seconds, as the timers are being created and awaited on demand.
+This will work and `await` for exactly `0.1 * 10` seconds, as the timers are being created only when needed.
 
 ### Promises Ouputing Callables
 
-It's easy to confuse Callables with return values.
+It's easy to confuse `Callables` with return values.
 
 Notice the difference between...
 
@@ -692,26 +692,26 @@ Promise.new().then(get_tree().create_timer(1).timeout).new(print("Hello"))
 Promise.new().then(get_tree().create_timer(1).timeout).then(print.bind("Hello"))
 ```
 
-The first one will print `"Hello"` instantly, and then have an output of `null` after `1` second.
-The second one will print `"Hello"` and have an ouput `null` after 1 second.
+The first one will print `"Hello"` instantly and then have an output of `null` after `1` second.
+The second one will print `"Hello"` and have an output `null` after 1 second.
 
 It's an easy mistake to make, and it can be a pain to debug. Be sure to pay attention.
 
 ## Modularability
 
-*Note*: This framework is developed via modular blocks, which YOU may also edit.
+_Note_: This framework is developed via modular blocks, which YOU may also edit.
 
 For example, the `all` coroutine is built on the inner class `AllCoroutine`, which is an extension of the inner class `ArrayCoroutine`, which is an extension of the inner class `MultiCoroutine`, which is an extension of the inner class `AbstractLogic`.
 
-All methods that handel `Godot Promise` logic is built on `AbstractLogic`. By iteratively making new inner class extentions to `AbstractLogic`, you can create building blocks for any imaginable way of handeling `Godot Promise`s.
+All methods that handle `Godot Promise` logic is built on `AbstractLogic`. By iteratively making new inner class extension to `AbstractLogic`, you can create building blocks for any imaginable way of handling a promise routine.
 
-Examples of how to create custom logic are given via the **PromiseEx** object class (also included within this addon) and Documetation.
+Examples of how to create custom logic are given via the **PromiseEx** object class (also included within this addon) and Documentation.
 
-The **PromiseEx** has `Promise` methods that load resources, an `all` that sorts signals from first to finish to last, a reverse `any`, and more. Check it out. 
+The **PromiseEx** has methods that load resources, an `all` that sorts signals from first to finish to last, a reverse `any`, and more. Check it out. The sky is the limit.
 
 ## Documentation
 
-For more information, the documentation includes a full list of functions and utility. A few more niche methods, not discussed here, are fully explained in there.
+For more information, the documentation includes a full list of functions and utilities. A few more niche methods, not discussed here, are fully explained there.
 
 Enjoy.
 
@@ -719,5 +719,11 @@ Enjoy.
 
 None
 
-## Profile
-If you like what I do, check out my [other stuff](https://ko-fi.com/soulstogether). Maybe buy me a coffee, if you want.
+## Links
+
+<script type='text/javascript' src='https://storage.ko-fi.com/cdn/widget/Widget_2.js'>
+</script>
+<script type='text/javascript'>
+kofiwidget2.init('Support me on Ko-fi', '#72a4f2', 'E2J420AV1G');
+kofiwidget2.draw();
+</script>

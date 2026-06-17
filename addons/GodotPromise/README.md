@@ -1,18 +1,126 @@
+<p align="center">
+  
+</p>
+
+<p align="center">
+  <a href="https://godotengine.org/download/windows/">
+	  <img alt="Static Badge" src="https://img.shields.io/badge/Godot-4.5%2B-blue">
+  </a>
+  <a href="./LICENSE"> 
+	<img alt="Static Badge" src="https://img.shields.io/badge/license-Apache%202.0-green">
+  </a>
+</p>
+
 # GodotPromise
 
-Hello everyone in the future!
+GodotPromise is a Godot 4.5+ addon created to improve how people use async Callables and Signals. It primarily uses the javascript [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) type as inspiration.
 
-I made this addon to hopefully improve how people use async Callables and Signals.
+Look here for knowledge on [Use Promises](#creating-promises), [Promise Chains](#promise-chains), and [Common Mistakes](#common-mistakes).
 
-## Godot Promise Vs ECMAScript Comparison
+## Quick Reference
 
-All features of the [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) type in `Javascript` has been implemented within `Godot Promise`. However, some features are harder to translate between the two mediums than others.
+Here is a quick reference of the tools provided for this addon.
 
-This section will provide a few notable comparisons to help you understand.
+### Construction Methods
 
-### Creating Promises
+These methods are used to construct useable Promises.
 
-#### Base Constructor
+| Name                  | Arguments                                    | Use                                                                                   | Result                                                                                                | Reject                         | Resolve                                                 |
+| --------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------ | ------------------------------------------------------- |
+| new()                 | Any                                          | The basic constructor for Promises                                                    | Returns the same result as 'await' would                                                              | Never                          | Always                                                  |
+| all()                 | An array of Promises                         | Awaits for all Promises to finish                                                     | Returns an array of values, from the Promises, once they all resolve                                  | If any Promise rejects         | If all Promises resolve                                 |
+| allSettled()          | An array of Promises                         | Provides the state of all Promises after finishing                                    | Returns an array of integer values representing the rejected or resolved states of all given Promises | Never                          | Always                                                  |
+| race()                | An array of Promises                         | Finishes when the first of the provided Promises finish                               | Returns the result of the first finished Promise                                                      | If the first Promise rejects   | If the first Promise resolves                           |
+| any()                 | An array of Promises                         | Finishes when the first, of the provided Promises, resolve. Or if they all reject     | Returns the result of the first resolved Promise, or an array of all Promises if none resolved        | If all Promises are rejected   | If at least one Promise is resolved                     |
+| reject()              | Any                                          | Always rejects                                                                        | Same as new(), but always rejects                                                                     | Always                         | Never                                                   |
+| resolve()             | Any                                          | Always Resolves                                                                       | Same as new()                                                                                         | Never                          | Always                                                  |
+| reject_raw()          | Any                                          | Always rejects without awaiting                                                       | Rejects any give argument, without awaiting                                                           | Always                         | Never                                                   |
+| resolve_raw()         | Any                                          | Always resolves without awaiting                                                      | Resolves any give argument, without awaiting                                                          | Never                          | Always                                                  |
+| withCallback()        | A Callable that takes two Callable arguments | Allows users to manipulate the resolve or rejection of a Promise via provided methods | A Promise that can be resolved or rejected by the provided Callable Arguments                         | If the Reject Method is called | If the Resolve Method is called or the Promise finishes |
+| withResolvers()       | Any                                          | Allows users to manipulate the resolve or rejection of a Promise via provided methods | Returns a dictionary with methods to resolve or reject the Promise.                                   | If the Reject Method is called | If the Resolve Method is called or the Promise finishes |
+| withCallbackResolvers | A Callable that takes two Callable arguments | Allows users to manipulate the resolve or rejection of a Promise via provided methods | withCallback() and withResolvers() combined                                                           |                                |
+
+The below are methods located only in the `PromiseEx` class.
+
+| Name        | Arguments                                   | Use                                                                                            | Result                                                                         | Reject                                                                 | Resolve                                                                     |
+| ----------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| interfere() | Any two arguments                           | Rejects or resolves the first argument depending on the speed of the second argument           | Same as awaiting the first argument                                            | If the second argument is returned before the first, reject the first. | If the second argument is not finished before the first, resolve the first. |
+| hold()      | Any two arguments                           | Holds until the second argument is finished                                                    | Same as awaiting the first argument, but delayed by the second                 | If the first argument rejects                                          | If the first arguments resolve                                              |
+| resource()  | An updater signal and a resource path       | Used to load a resource via a background thread                                                | Returns a resource or null, depending on if the resource could be loaded       | If the resource could not be loaded                                    | If the resource was loaded successfully                                     |
+| sort()      | An array of Promises                        | Processes Promises in the order they finished                                                  | Returns the result of the Promises in the order they were finished in          | Never                                                                  | Always                                                                      |
+| rsort()     | An array of Promises                        | Processes Promises in the reversed order they finished                                         | Returns the result of the Promises in the reversed order they were finished in | Never                                                                  | Always                                                                      |
+| firstN()    | An array of Promises and a positive integer | Processes the first N Promises in the order they finished                                      | Returns the first N results of the Promises in the order they were finished in | Never                                                                  | Always                                                                      |
+| lastN()     | An array of Promises and a positive integer | Processes the last N Promises in the order they finished                                       | Returns the last N results of the Promises in the order they were finished in  | Never                                                                  | Always                                                                      |
+| pipe()      | An array of Promises or Callables           | Binds the previous Promise's result as an argument to the next for all given arguments         | Returns the result of chaining all given async values together                 | If any given Promises values reject                                    | If all given Promises resolve                                               |
+| anyReject() | An array of Promises                        | Returns the result of the first rejected Promise, or an array of all Promises if none rejected | If at least one Promises is rejected                                           | If all Promises are resolved                                           |
+
+Keep in mind that the extra functionality of these methods are ignored in the above table for simplicity. Read the Godot annotations for a full overview.
+
+### Chain Methods
+
+These methods are used to chain useable Promises together.
+
+| Name      | Arguments | Use                                                        | Result                                                                                          | Reject                                    | Resolve                                         |
+| --------- | --------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------- | ----------------------------------------------- |
+| then()    | any       | Awaits the given argument if the previous Promise resolves | If the previous Promise resolves, returns the same as await. Otherwise, return previous Promise | If this and the previous Promise resolves | If either this or the previous Promise rejects  |
+| catch()   | any       | Awaits the given argument if the previous Promise rejects  | If the previous Promise resolves, returns the same as await. Otherwise, return previous Promise | If this and the previous Promise rejects  | If either this or the previous Promise resolves |
+| finally() | any       | Awaits the given argument                                  | Returns the same as await.                                                                      | If the previous Promise rejects           | If the previous Promise resolves                |
+
+Keep in mind that the extra functionality of these methods are ignored in the above table for simplicity. Read the Godot annotations for a full overview.
+
+### Helper Methods
+
+| Name               | Use                                                                                            |
+| ------------------ | ---------------------------------------------------------------------------------------------- |
+| execute            | Starts a paused Promise's execution                                                            |
+| reset              | Resets a Promise to be executed again                                                          |
+| reset_chain        | Resets a Promise, and all prior Promises (in the Promise chain), to be executed again          |
+| is_finished        | Returns if a Promise has finished                                                              |
+| peek               | Returns the current status of a Promise: Initialized, Pending, Accepted, Rejected, or Canceled |
+| get_prev           | Returns the prior Promises (in the Promise chain)                                              |
+| get_promise_object | Returns the async object the Promise is awaiting for                                           |
+| get_result         | Returns the result of awaiting, or null if the Promise hasn't finished                         |
+
+Keep in mind that the extra functionality of these methods are ignored in the above table for simplicity. Read the Godot annotations for a full overview.
+
+### Logic Classes
+
+Logic Classes are this addon's method in implementing and extending Promise Logic
+
+| Name                         | Use                                                                                              | Extends From   | Used in                                                                      |
+| ---------------------------- | ------------------------------------------------------------------------------------------------ | -------------- | ---------------------------------------------------------------------------- |
+| AbstractLogic                | The base logic for all Promises                                                                  | RefCounted     | All                                                                          |
+| DirectCoroutineLogic         | A logic class that handles both resolve and rejected cases of a direct Promise                   | AbstractLogic  | new(), withCallback(), withResolvers(), withCallbackResolvers()              |
+| OverrideStatusCoroutineLogic | A logic class for overwriting a Promises return state                                            | AbstractLogic  | reject(), reject_raw(), resolve(), resolve_raw(), then(), catch(), finally() |
+| OnSignalCoroutine            | A logic class used to update a Promise via an external signal                                    | AbstractLogic  | --                                                                           |
+| MultiCoroutine               | A logic class used to handle an array of async types                                             | AbstractLogic  | --                                                                           |
+| RaceCoroutine                | A logic class that returns the first result to finish awaiting                                   | MultiCoroutine | race()                                                                       |
+| ArrayCoroutine               | A logic class that handles an array of async types, and return an array of values                | MultiCoroutine | --                                                                           |
+| AllCoroutine                 | A logic class that resolves an array of async types                                              | ArrayCoroutine | all()                                                                        |
+| AllSettledCoroutine          | A logic class that resolves a status array of finished Promises                                  | ArrayCoroutine | allSettled()                                                                 |
+| AnyCoroutine                 | A logic class that resolves the first resolved Promise, or rejects an array of rejected Promises | ArrayCoroutine | any()                                                                        |
+
+The below are logic classes located only in the `PromiseEx` class.
+
+| Name               | Use                                                                                                                  | Extends From         | Used in     |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------- | -------------------- | ----------- |
+| InterfereCoroutine | A logic class that takes two arguments, and rejects or resolves the first depending on the order the Promises finish | DirectCoroutineLogic | interfere() |
+| HoldCoroutine      | A logic class that takes two arguments, and doesn't finish the first until the second one is finished                | DirectCoroutineLogic | hold()      |
+| ResourceCoroutine  | A logic class that loads a resource in the background                                                                | OnSignalCoroutine    | resource()  |
+| SortCoroutine      | A logic class that resolves an array of all Promises results in the order they were resolved in                      | AllCoroutine         | sort()      |
+| RSortCoroutine     | A logic class that resolves an array of all Promises results in the reverse order they were resolved in              | AllCoroutine         | rsort()     |
+| FirstNCoroutine    | A logic class that resolves an array of the first N Promises results in the order they were resolved in              | SortCoroutine        | firstN()    |
+| LastNCoroutine     | A logic class that resolves an array of the last N Promises results in the order they were resolved in               | RSortCoroutine       | lastN()     |
+| PipeCoroutine      | A logic class to pipe the result of an array of Promises into each other for a final result                          | MultiCoroutine       | pipe()      |
+| AnyRejectCoroutine | A logic class used to either return the first rejected result, or an array of all resolved Promises                  | ArrayCoroutine       | anyReject() |
+
+Feel free to extend or create your own logic classes to create custom Promise routines.
+
+## How To Use
+
+Godot Promise can be a complicated object to use. Here is a basic explanation to help.
+
+### Base Constructor
 
 In `ECMAScript`, there is only one proper way to construct a promise.
 
@@ -33,11 +141,11 @@ Promise.new(obj)
 
 The above code will create a basic `Godot Promise` that automatically **resolves** to the value `obj`, without any need for additional code.
 
-#### Receiving Output from Promises
+### Receiving Output from Promises
 
 In `ECMAScript`, you can get a ` Godot Promise`'s output via the available `then`, `catch`, and `finally` chain methods. On the other hand, `Godot Promises` has a few different ways to get the output.
 
-Firstly, `Godot Promises` automatically return their finished value via the `finished` `Signal`. If you want to get the value of a `Godot Promise` after it is **resolved** or **rejected**, you just `await` like so:
+Firstly, `Godot Promises` automatically return their finished value via the `finished` Signal. If you want to get the value of a `Godot Promise` after it is **resolved** or **rejected**, you just `await` like so:
 
 ```
 # Gets value when 'Godot Promise' finishes.
@@ -60,12 +168,12 @@ It is also important to note that if we removed the `obj`, such that the Promise
 
 As can already be seen, `Godot Promise` uses `null` in place of `ECMAScript`'s `undefined`.
 
-#### Auto Async Parameter Awaiting
+### Auto Async Parameter Awaiting
 
 _One more thing to notice_: this constructor works differently depending on what it’s given constructor argument is.
 
-If `obj` is **NOT** a `Signal`, `Callable`, or another `Godot Promise`, the `Godot Promise` will not defer the result and immediately return the raw parameter as given.
-Otherwise, the `Godot Promise` will automatically `await` for the `Signal`, `Callable`, or `Godot Promise` to finish before then returning the result.
+If `obj` is **NOT** a Signal, Callable, or another `Godot Promise`, the `Godot Promise` will not defer the result and immediately return the raw parameter as given.
+Otherwise, the `Godot Promise` will automatically `await` for the Signal, Callable, or `Godot Promise` to finish before then returning the result.
 
 For example:
 
@@ -88,7 +196,7 @@ await Promise.new(test).finished
 await Promise.new(Promise.new("Hello")).finished
 ```
 
-_Note_: `Callable` and `Signal` types -- with no return value -- will output the default `null` after processing in a `Godot Promise`
+_Note_: Callable and Signal types -- with no return value -- will output the default `null` after processing in a `Godot Promise`
 
 As noticed, this is largely different from `ECMAScript`'s Promises, which do not automatically resolve async parameters given to it.
 
@@ -126,11 +234,11 @@ await Promise.reject(Promise.new(get_tree().create_timer(1.0).timeout)).finished
 await Promise.resolve(Promise.new(get_tree().create_timer(1.0).timeout)).finished
 ```
 
-These methods _also_ automatically `await` for `async` parameters to finish, similar to the base `Promise.new()` constructor. However, `Promise.new()` will always **resolve** `obj`, while `reject` will always **reject** `obj`.
+These methods _also_ automatically `await` for async parameters to finish, similar to the base `Promise.new()` constructor. However, `Promise.new()` will always **resolve** `obj`, while `reject()` will always **reject** `obj`.
 
 `resolve()` is functionally identical to `Promise.new()` and was only added for consistency.
 
-#### Stall Execution
+### Stall Execution
 
 In `Godot Promise`, you can also use an additional `boolean` parameter to defer a `Godot Promise`, stalling it from executing. For example:
 
@@ -200,7 +308,7 @@ p2.execute()
 p1.execute()
 ```
 
-#### Reset Execution
+### Reset Execution
 
 After execution, you can also reset a `Godot Promise` to be reused. For example:
 
@@ -223,9 +331,9 @@ await val.finished
 
 _Note_: for `Godot Promise` chains (referred to later), make sure to use `reset_chain` instead.
 
-#### Callbacks and Resolvers
+### Callbacks and Resolvers
 
-Lastly, you might have noticed that the above `Godot Promise` constructors only either **resolve** or **reject** statically (decided on compilation), with no ability to change during runtime based on the parameters. This is very lacking compared to `ECMAScript`. For example:
+Lastly, you might have noticed that the above `Godot Promise` constructors only either **resolve** or **reject**, with no ability to change (after the Promise started) from runtime factors. This is very lacking compared to `ECMAScript`. For example:
 
 ```
 // Resolves or rejects if the `resolve` or `reject` lambdas are called inside the `Promise`.
@@ -327,7 +435,7 @@ p2.execute()
 p1.execute()
 ```
 
-#### Other Static Methods
+### Other Static Methods
 
 For simplicity, we also have a few other basic built-in constructors for your needs.
 
@@ -373,15 +481,15 @@ await Promise.any([p1, p2, p3]).finished
 
 Pretty similar, right?
 
-#### Try Constructor
+### Try Constructor
 
-_Note_: Unless you purposefully use an `assert`, `Godot` already continues after errors. Therefore, the `try-catch` cannot be implemented exactly according to `ECMAScript` standards.
+_Note_: Unless you purposefully use an assert, `Godot` already continues after errors. Therefore, the `try-catch` cannot be implemented exactly according to `ECMAScript` standards.
 
 Instead, it is recommended to code your own error handling instead of relying on exceptions.
 
-### Promise Chains
+## Promise Chains
 
-#### Then and Catch Basics
+### Then and Catch Basics
 
 `Promise Chains` are defined as the situation where `Promises` are delayed execution and only trigger when the previous `Promise` (within the chain) is finished.
 
@@ -419,7 +527,7 @@ Promise.resolve().then(print.bind(1)).then(print.bind(2)).finally(print.bind(3))
 Promise.reject().catch(print.bind(1)).catch(print.bind(2)).finally(print.bind(3))
 ```
 
-#### Then and Catch Parameters
+### Then and Catch Parameters
 
 Notice that the `Promise Chain`s for both `ECMAScript` and `Godot Promise` stops at the first `catch` statement, yet continues through every `then` statement.
 
@@ -477,7 +585,7 @@ Promise.new().then(c1, false).then(c2, false)
 
 _Note_: Although piping from `Promise` to `Promise` is a standard feature in `ECMAScript`, attempting to bind arguments to a `Callable` (that doesn't ask for parameters) in `Godot` causes an error. Thus, to avoid common errors, `pipe_prev` is defaulted to `false`. Use it only when you need to.
 
-#### Split Chains
+### Split Chains
 
 Keep in mind you can also split `Promises`.
 
@@ -505,11 +613,11 @@ promise.then(print.bind(1))
 promise.then(print.bind(2))
 ```
 
-#### Other Chain Information
+### Other Chain Information
 
 For chains to function in `Godot`, each `Godot Promise` is has a known `status`. You can use the method `peek` to check the status of a `Promise`.
 
-All possible `statuses` a `Promise` can have are shown in the documentation:
+All possible statuses a `Promise` can have are shown in the documentation:
 
 ```
 enum PromiseStatus {
@@ -533,7 +641,7 @@ p1.reset() # Only resets the head (the last 'then()')
 p1.reset_chain() # Resets all promises before and including the head (the entire chain)
 ```
 
-### Common mistakes
+## Common Mistakes
 
 _Note_: that Promise is a complex object, so it's easy to misuse.
 
@@ -578,11 +686,11 @@ while p.get_prev() != null:
 p.execute()
 ```
 
-### ReferenceCounter
+## ReferenceCounter
 
-#### Basic Ref
+### Basic Ref
 
-When using `Godot Promise`, you might want to return the `finished` output of the `Signal`. To do that, you might try something like...
+When using `Godot Promise`, you might want to return the `finished` output of the Signal. To do that, you might try something like...
 
 ```
 func _test() -> Signal:
@@ -594,7 +702,7 @@ func other_test() -> void:
 
 However, this will cause an error.
 
-`Promise` is a `RefCounter` object. This means that, in a situation where the reference to a `Godot Promise` is no longer stored anywhere, the `Godot Promise` will automatically clear itself, which will clear the `Signal` too. Hence, the `error` when attempting to use the `signal`.
+`Promise` is a `RefCounter` object. This means that, in a situation where the reference to a `Godot Promise` is no longer stored anywhere, the `Godot Promise` will automatically clear itself, which will clear the Signal too. Hence, the `error` when attempting to use the Signal.
 
 To fix this, you must store the Promise somehow...
 
@@ -621,7 +729,7 @@ func other_test() -> void:
 
 This may appear ugly, but it's something needed for the object to be automatically constructed and destroyed.
 
-#### Promise Chain Refs
+### Promise Chain Refs
 
 _Note_: `Godot Promises` can store a reference to the previous `Godot Promise` in a `Godot Promise Chain`, but they do not store a reference to the next `Godot Promise` in a chain.
 
@@ -645,7 +753,7 @@ func other_test_2() -> void:
     await _test_2().finished
 ```
 
-### Promises And Timers
+## Promises And Timers
 
 Look at the code below...
 
@@ -676,7 +784,7 @@ func test() -> void:
 
 This will work and `await` for exactly `0.1 * 10` seconds, as the timers are being created only when needed.
 
-### Promises Ouputing Callables
+## Promises Ouputing Callables
 
 It's easy to confuse `Callables` with return values.
 
@@ -708,6 +816,29 @@ All methods that handle `Godot Promise` logic is built on `AbstractLogic`. By it
 Examples of how to create custom logic are given via the **PromiseEx** object class (also included within this addon) and Documentation.
 
 The **PromiseEx** has methods that load resources, an `all` that sorts signals from first to finish to last, a reverse `any`, and more. Check it out. The sky is the limit.
+
+## Installation
+
+#### Asset Library or Asset Store (Recommended - Stable)
+
+- In Godot, open the [AssetLib](https://godotengine.org/asset-library/asset) or [AssetStore](https://store.godotengine.org/) tab.
+- Search for and select "GodotPromise".
+- Download then install the plugin (be sure to only select the `GodotPromise` directory).
+- Enable the plugin inside Project/Project Settings/Plugins.
+
+#### Github Releases (Recommended - Stable)
+
+- Download a release build.
+- Extract the zip file and move the `addons/GodotPromise` directory into the project `addon` folder location.
+- Enable the plugin inside Project/Project Settings/Plugins.
+
+#### Github Main (Latest - Unstable)
+
+- Download the latest main branch.
+- Extract the zip file and move the `addons/GodotPromise` directory into project's `addon` folder location.
+- Enable the plugin inside Project/Project Settings/Plugins.
+
+For more help, see [Godot's official documentation](https://docs.godotengine.org/en/stable/tutorials/plugins/editor/installing_plugins.html).
 
 ## Documentation
 

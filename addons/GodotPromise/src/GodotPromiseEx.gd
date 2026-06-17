@@ -108,7 +108,7 @@ static func pipe(
 
 
 ## Returns a [Promise] that finishes and returns the result of the first coroutine to be rejected
-## from the given coroutines. It ignores all coroutines accept, unless all coroutines are accepted.
+## from the given coroutines. It ignores all coroutines accepted, unless all coroutines are accepted.
 ## If all coroutines are accepted, it will send an array of accepted outputs.
 ## [br][br]
 ## Also sees [method Promise.any].
